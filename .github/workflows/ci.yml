@@ -1,0 +1,100 @@
+name: ci
+
+on:
+  push:
+    branches: [main, 'compile_v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: install web dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: web
+      - name: audit web dependencies
+        run: npm audit --audit-level=low
+        working-directory: web
+      - name: no em dash in markdown
+        run: |
+          if grep -rIl --include='*.md' --exclude-dir=node_modules --exclude-dir=.git $'\xe2\x80\x94' .; then
+            echo "em dash found in Markdown"; exit 1
+          fi
+      - name: format, vet and typecheck
+        run: make check
+      - name: build
+        run: make build VERSION=v0.0.0-ci
+      - name: cross-compile
+        run: |
+          for t in linux/arm64 darwin/arm64 darwin/amd64 windows/amd64; do
+            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -o /dev/null ./cmd/formnet
+          done
+      - name: smoke
+        run: |
+          FORMNET_DATA="$RUNNER_TEMP/data" ./bin/formnet &
+          for i in $(seq 1 50); do curl -fsS http://127.0.0.1:8760/healthz && break; sleep 0.2; done
+          curl -fsS http://127.0.0.1:8760/api/status
+          curl -fsS -x http://127.0.0.1:8761 http://127.0.0.1:8760/healthz
+          curl -fsS 'http://127.0.0.1:8760/api/flows' | grep -q '"host":"127.0.0.1"'
+          FORMNET_DATA="$RUNNER_TEMP/data" ./bin/formnet ca
+          kill %1
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go tests
+        run: go test -count=1 ./...
+  window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: build the window
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: build the server
+        run: CGO_ENABLED=0 go build -o bin/formnet ./cmd/formnet
+      - name: pytest and Playwright
+        run: |
+          pip install pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: window smoke
+        run: python -m pytest web/tests/window -q -p no:cacheprovider

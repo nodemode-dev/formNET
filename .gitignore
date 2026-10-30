@@ -1,0 +1,12 @@
+/bin/
+/release/
+/data/
+/web/node_modules/
+/web/dist/*
+!/web/dist/.gitkeep
+.DS_Store
+/src-tauri/target/
+/src-tauri/gen/
+/src-tauri/binaries/*
+!/src-tauri/binaries/.gitkeep
+__pycache__/
