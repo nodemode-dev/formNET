@@ -10,7 +10,7 @@ What a program actually does on the network, not what it promises: an intercepti
 - `internal/ca/` the local root certificate (made on first run in the data folder) and per-host leaf certificates.
 - `internal/proxy/` the proxy: plain HTTP forwarding, CONNECT tunnels, TLS interception with the root, passthrough patterns, body capture up to the limit, byte and time accounting into the Store.
 - `internal/machine/` the connection table and owning processes per platform (lsof, ps and nettop on macOS, /proc on Linux, netstat on Windows), polled on an interval; it also names the process behind a proxy client port. Reverse DNS is off unless `FORMNET_REVERSE_DNS=1`.
-- `internal/server/` the loopback API, the server-sent event stream and the embedded client; the route list and the session rules are in its package comment. Every API call needs the run's session (cookie from `/?token=`, or a bearer header).
+- `internal/server/` the loopback API, the server-sent event stream and the embedded client; the route list and the session rules are in its package comment. Every API call needs the run's token as a bearer header (the page reads it from `/?token=` and keeps it in memory; the stream and downloads pass it as a query parameter). No cookie, ever: a cookie for 127.0.0.1 reaches every other local port.
 - `web/` the client: vanilla TypeScript and Vite, no UI framework. `web/tests/window/` is the Playwright smoke CI runs.
 - `src-tauri/` the desktop window; it starts the server as a sidecar and waits for the `formnet desktop ready http://127.0.0.1:PORT/` line on stdout.
 - `assets/` repo-level art (logo). `deploy/` the draft formcompiler registry entry.

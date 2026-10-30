@@ -19,13 +19,15 @@
 //
 // Every request must carry a Host header for the loopback address (DNS
 // rebinding guard). Cross-site requests from a browser are refused on every
-// route but the page itself. The API, the stream and the certificate need a
-// session: the page is opened once at /?token=<the run's token> (printed by
-// `formnet serve`, or passed by the desktop app), the server answers with an
-// HttpOnly, SameSite=Strict cookie and redirects to /, and from then on the
-// cookie (or an Authorization: Bearer header, for scripts) is the session.
-// Loopback is shared by every program and user on the computer, and the
-// recordings hold other programs' secrets, so loopback alone is not enough.
+// route but the page itself. The API, the stream and the certificate need
+// the run's token: the page is opened once at /?token=<token> (printed by
+// `formnet serve`, or passed by the desktop app), keeps it in memory and
+// sends it as `Authorization: Bearer <token>`; the event stream and the
+// downloads, which cannot set headers, pass it as a `token` query parameter.
+// There is no cookie on purpose: a browser sends a cookie for 127.0.0.1 to
+// every port, so a cookie would reach any other local server the person
+// visits. Loopback is shared by every program and user on the computer, and
+// the recordings hold other programs' secrets, so loopback alone is not enough.
 package server
 
 import (
@@ -71,9 +73,6 @@ type MachineSource interface {
 	Latest() machine.Snapshot
 	Subscribe(ctx context.Context) <-chan machine.Snapshot
 }
-
-// SessionCookie is the cookie that carries the session.
-const SessionCookie = "formnet_session"
 
 // Deps are the parts the handler serves.
 type Deps struct {
@@ -145,6 +144,10 @@ func (s *handler) guard(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "no session: open formnet from the address printed by formnet serve, or run formnet open")
 			return
 		}
+		if r.URL.Query().Has("token") {
+			// Never let a token-bearing URL leak through the referrer.
+			w.Header().Set("Referrer-Policy", "no-referrer")
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -165,19 +168,13 @@ func (s *handler) tokenMatches(candidate string) bool {
 	return candidate != "" && subtle.ConstantTimeCompare([]byte(candidate), []byte(s.Token)) == 1
 }
 
-// hasSession accepts the session cookie or a bearer token.
+// hasSession accepts the token as a bearer header or, for the stream and
+// the downloads, as a query parameter.
 func (s *handler) hasSession(r *http.Request) bool {
-	if c, err := r.Cookie(SessionCookie); err == nil && s.tokenMatches(c.Value) {
-		return true
-	}
 	if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 		return s.tokenMatches(strings.TrimSpace(bearer))
 	}
-	return false
-}
-
-func (s *handler) setSession(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Value: s.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	return s.tokenMatches(r.URL.Query().Get("token"))
 }
 
 func portOf(addr string) string {
@@ -518,9 +515,10 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 
 const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
 
-// client serves the embedded web client. Static files need no session; the
-// page itself exchanges ?token= for the session cookie and otherwise needs it.
-// Paths without a file fall back to index.html so the page can own its routes.
+// client serves the embedded web client. The page and its files are static
+// and need no session; the page reads ?token= itself and keeps it in memory.
+// A wrong token on the page is refused so a typo is noticed at once. Paths
+// without a file fall back to index.html so the page can own its routes.
 func (s *handler) client() http.Handler {
 	files := http.FS(s.Dist)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -539,17 +537,8 @@ func (s *handler) client() http.Handler {
 				}
 			}
 		}
-		if token := r.URL.Query().Get("token"); token != "" {
-			if !s.tokenMatches(token) {
-				s.noSession(w, http.StatusForbidden)
-				return
-			}
-			s.setSession(w)
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		}
-		if !s.hasSession(r) {
-			s.noSession(w, http.StatusUnauthorized)
+		if token := r.URL.Query().Get("token"); token != "" && !s.tokenMatches(token) {
+			s.noSession(w, http.StatusForbidden)
 			return
 		}
 		index, err := s.Dist.Open("index.html")
@@ -566,7 +555,7 @@ func (s *handler) client() http.Handler {
 
 const noSessionPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>formnet</title>
 <meta name="color-scheme" content="dark light"><style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5}code{font-family:ui-monospace,monospace}</style></head>
-<body><h1>formnet</h1><p>This page has no session. formnet answers only to the page it opened itself, so that no other program on this computer can read the recordings.</p>
+<body><h1>formnet</h1><p>That token is not this run's. formnet answers only to the page it opened itself, so that no other program on this computer can read the recordings.</p>
 <p>Open formnet from the address printed by <code>formnet serve</code> (it carries this run's token), or run <code>formnet open</code>.</p></body></html>`
 
 func (s *handler) noSession(w http.ResponseWriter, status int) {

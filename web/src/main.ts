@@ -5,6 +5,7 @@ import "./styles/detail.css";
 
 import { api, onUnauthorized, openStream, SessionError } from "./api.ts";
 import { applySavedTheme, installMenuHook } from "./desktop.ts";
+import { boot as bootSession } from "./session.ts";
 import { h } from "./dom.ts";
 import { Store, applyFlowEvents, withFlows } from "./state.ts";
 import type { FlowEvent } from "./types.ts";
@@ -67,30 +68,7 @@ const flush = () => {
   scheduleHosts();
 };
 
-const stopStream = openStream({
-  hello: (hello) => {
-    const s = store.get();
-    const epoch = hello.epoch ?? "";
-    store.update({ connected: true, epoch });
-    // A different epoch means the server restarted or cleared; the seq space is new.
-    reloadFlows();
-    if (s.epoch && epoch === s.epoch && hello.dropped) store.update({ notice: `${hello.dropped} events were missed; reloaded` });
-    refreshStatus();
-    refreshHosts();
-    api.machine().then((machine) => store.update({ machine })).catch(() => undefined);
-  },
-  resync: () => {
-    pending = [];
-    reloadFlows();
-  },
-  close: () => store.update({ connected: false }),
-  unauthorized: () => lostSession(),
-  flow: (e) => {
-    pending = [...pending, e];
-    if (!frame) frame = requestAnimationFrame(flush);
-  },
-  machine: (machine) => store.update({ machine }),
-});
+let stopStream: () => void = () => undefined;
 
 function lostSession(): void {
   if (store.get().sessionLost) return;
@@ -107,6 +85,39 @@ function lostSession(): void {
 }
 
 onUnauthorized(lostSession);
+
+if (!bootSession()) {
+  lostSession();
+} else {
+  stopStream = openStream(streamHandlers());
+}
+
+function streamHandlers(): Parameters<typeof openStream>[0] {
+  return {
+    hello: (hello) => {
+      const s = store.get();
+      const epoch = hello.epoch ?? "";
+      store.update({ connected: true, epoch });
+      // A different epoch means the server restarted or cleared; the seq space is new.
+      reloadFlows();
+      if (s.epoch && epoch === s.epoch && hello.dropped) store.update({ notice: `${hello.dropped} events were missed; reloaded` });
+      refreshStatus();
+      refreshHosts();
+      api.machine().then((machine) => store.update({ machine })).catch(() => undefined);
+    },
+    resync: () => {
+      pending = [];
+      reloadFlows();
+    },
+    close: () => store.update({ connected: false }),
+    unauthorized: () => lostSession(),
+    flow: (e) => {
+      pending = [...pending, e];
+      if (!frame) frame = requestAnimationFrame(flush);
+    },
+    machine: (machine) => store.update({ machine }),
+  };
+}
 
 window.setInterval(() => {
   if (document.visibilityState === "visible" && !store.get().sessionLost) refreshStatus();

@@ -68,7 +68,7 @@ func do(t *testing.T, srv *httptest.Server, method, path string, body string, he
 		t.Fatal(err)
 	}
 	req.Host = "127.0.0.1:8760"
-	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: testToken})
+	req.Header.Set("Authorization", "Bearer "+testToken)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -211,7 +211,7 @@ func TestStreamDeliversFlowEvents(t *testing.T) {
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/stream", nil)
 	req.Host = "127.0.0.1:8760"
-	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: testToken})
+	req.Header.Set("Authorization", "Bearer "+testToken)
 	res, err := srv.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -284,10 +284,16 @@ func TestSessionRequiredForAPIAndCertificate(t *testing.T) {
 			t.Fatalf("%s without a session: %d", p, res.StatusCode)
 		}
 	}
-	res := bare(t, srv, http.MethodGet, "/", nil)
-	body, _ := io.ReadAll(res.Body)
-	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "formnet open") {
-		t.Fatalf("page without a session: %d %q", res.StatusCode, body)
+	if res := bare(t, srv, http.MethodGet, "/", nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("the page itself is static and needs no session: %d", res.StatusCode)
+	}
+	stream := bare(t, srv, http.MethodGet, "/api/stream?token="+testToken, nil)
+	stream.Body.Close() // an open stream would keep the test server from closing
+	if stream.StatusCode != http.StatusOK {
+		t.Fatalf("the stream takes the token as a query parameter: %d", stream.StatusCode)
+	}
+	if res := bare(t, srv, http.MethodGet, "/ca.pem?token="+testToken, nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("downloads take the token as a query parameter: %d", res.StatusCode)
 	}
 	if res := bare(t, srv, http.MethodGet, "/assets/app.js", nil); res.StatusCode != http.StatusOK {
 		t.Fatalf("static files need no session: %d", res.StatusCode)
@@ -303,26 +309,24 @@ func TestSessionRequiredForAPIAndCertificate(t *testing.T) {
 	}
 }
 
-func TestTokenExchangeSetsCookieAndRedirects(t *testing.T) {
+func TestPageWithTokenSetsNoCookie(t *testing.T) {
 	srv, _, _ := newTest(t)
 	res := bare(t, srv, http.MethodGet, "/?token="+testToken, nil)
-	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/" {
-		t.Fatalf("exchange: %d %q", res.StatusCode, res.Header.Get("Location"))
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), "<title>formnet</title>") {
+		t.Fatalf("page with token: %d %q", res.StatusCode, body)
 	}
-	var cookie *http.Cookie
-	for _, c := range res.Cookies() {
-		if c.Name == SessionCookie {
-			cookie = c
-		}
+	if len(res.Cookies()) != 0 || res.Header.Get("Set-Cookie") != "" {
+		t.Fatal("no cookie may be set: a cookie for 127.0.0.1 would reach every other local port")
 	}
-	if cookie == nil || cookie.Value != testToken || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
-		t.Fatalf("cookie: %+v", cookie)
+	if res.Header.Get("Referrer-Policy") != "no-referrer" {
+		t.Fatal("a token-bearing URL must not leak through the referrer")
 	}
 	if res := bare(t, srv, http.MethodGet, "/?token=wrong0000000000000000", nil); res.StatusCode != http.StatusForbidden {
 		t.Fatalf("wrong token: %d", res.StatusCode)
 	}
-	if res := bare(t, srv, http.MethodGet, "/?token=", nil); res.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("empty token: %d", res.StatusCode)
+	if res := bare(t, srv, http.MethodGet, "/api/status?token=wrong0000000000000000", nil); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong query token on the API: %d", res.StatusCode)
 	}
 }
 

@@ -1,6 +1,7 @@
-"""Window smoke for formnet: the built binary serves the client, the three
-views switch, the status strip shows the proxy, and a request sent through
-the proxy appears in the Flows table with its detail pane.
+"""Window smoke for formnet: the built binary serves the client, the page's
+bearer token leaves the address bar and survives a reload, the views switch,
+the status strip shows the proxy, and a request sent through the proxy
+appears in the Flows table with its detail pane.
 
 Run from the repo root after `make build`:
     python -m pytest web/tests/window -q
@@ -94,8 +95,8 @@ def page(server):
         errors: list[str] = []
         pg.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
         pg.on("pageerror", lambda err: errors.append(str(err)))
-        # The page is opened once with the token; the server sets the session
-        # cookie and redirects to /.
+        # The page is opened once with the token in the address; the client
+        # keeps it (module and sessionStorage) and removes it from the address.
         pg.goto(f"{server['url']}/?token={server['token']}")
         pg.wait_for_selector(".topbar")
         yield pg, errors
@@ -139,17 +140,33 @@ def target():
         httpd.shutdown()
 
 
-def test_session_redirect_and_cookie_required(page: tuple[Page, list[str]], server) -> None:
+def test_token_leaves_address_and_api_needs_it(page: tuple[Page, list[str]], server) -> None:
     pg, _ = page
-    assert pg.url == server["url"] + "/", f"landed on {pg.url}, not /"
-    assert "token" not in pg.url
-    # A client without the cookie (a plain urllib request) gets 401 JSON.
+    # The client moved the token out of the address bar (history.replaceState).
+    assert pg.url == server["url"] + "/", f"address is {pg.url}, not /"
+    assert pg.locator(".session-lost").count() == 0
+    # A request without the Authorization header (plain urllib) gets 401 JSON.
     try:
         urllib.request.urlopen(server["url"] + "/api/status", timeout=5)
-        raise AssertionError("no-cookie /api/status answered 200")
+        raise AssertionError("/api/status without a token answered 200")
     except urllib.error.HTTPError as err:
-        assert err.code == 401, f"no-cookie /api/status answered {err.code}"
+        assert err.code == 401, f"/api/status without a token answered {err.code}"
         assert "error" in json.loads(err.read().decode())
+    # With the bearer header it answers.
+    req = urllib.request.Request(server["url"] + "/api/status", headers={"Authorization": f"Bearer {server['token']}"})
+    with urllib.request.urlopen(req, timeout=5) as res:
+        assert res.status == 200
+
+
+def test_reload_keeps_the_session(page: tuple[Page, list[str]], server) -> None:
+    pg, errors = page
+    # The token survives a reload through sessionStorage; the address stays /.
+    pg.reload()
+    pg.wait_for_selector(".topbar", timeout=10000)
+    assert pg.url == server["url"] + "/"
+    assert pg.locator(".session-lost").count() == 0
+    pg.wait_for_selector(".conn:has-text('connected')", timeout=10000)
+    assert errors == [], f"console errors after reload: {errors}"
 
 
 def test_title_and_views(page: tuple[Page, list[str]]) -> None:

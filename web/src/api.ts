@@ -1,3 +1,4 @@
+import { authHeaders, withToken } from "./session.ts";
 import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, ProxyStatus, Snapshot, Status } from "./types.ts";
 
 const base = location.origin;
@@ -26,7 +27,7 @@ function check(res: Response, path: string): void {
 }
 
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(base + path, { credentials: "same-origin" });
+  const res = await fetch(base + path, { credentials: "omit", headers: authHeaders() });
   check(res, path);
   return (await res.json()) as T;
 }
@@ -34,8 +35,8 @@ async function getJSON<T>(path: string): Promise<T> {
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(base + path, {
     method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    credentials: "omit",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (res.status === 401) check(res, path);
@@ -78,8 +79,8 @@ export const api = {
   proxy: () => getJSON<ProxyStatus>("/api/proxy"),
   updateProxy: (u: { intercept?: boolean; passthrough?: string[] }) => postJSON<ProxyStatus>("/api/proxy", u),
   ca: () => getJSON<CAInfo>("/api/ca"),
-  harURL: (f: FlowFilter) => `${base}/api/export/har${filterQuery(f)}`,
-  caURL: () => `${base}/ca.pem`,
+  harURL: (f: FlowFilter) => withToken(`${base}/api/export/har${filterQuery(f)}`),
+  caURL: () => withToken(`${base}/ca.pem`),
 };
 
 export interface Hello {
@@ -128,7 +129,7 @@ export function openStream(handlers: StreamHandlers): () => void {
     handlers.close();
     if (stopped) return;
     try {
-      const res = await fetch(`${base}/api/status`, { credentials: "same-origin" });
+      const res = await fetch(`${base}/api/status`, { credentials: "omit", headers: authHeaders() });
       if (res.status === 401) {
         stop();
         handlers.unauthorized();
@@ -144,7 +145,7 @@ export function openStream(handlers: StreamHandlers): () => void {
 
   const connect = () => {
     if (stopped) return;
-    source = new EventSource(`${base}/api/stream`);
+    source = new EventSource(withToken(`${base}/api/stream`));
     source.addEventListener("hello", (ev) => {
       retry = 1000;
       handlers.hello(parse<Hello>(ev) ?? { version: "", flows: 0 });
