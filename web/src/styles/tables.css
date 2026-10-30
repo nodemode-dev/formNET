@@ -1,0 +1,129 @@
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+td.num,
+th:has(+ th):nth-last-child(-n + 0) {
+  text-align: right;
+}
+
+.flows td.path {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flows td.host {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flows td.proc {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flows tbody tr {
+  cursor: pointer;
+}
+
+.flows tbody tr:hover {
+  background: var(--bg-2);
+}
+
+.flows tbody tr.selected {
+  background: var(--sel);
+}
+
+.flows tbody tr.bad td.status,
+.flows tbody tr.bad td.path {
+  color: var(--bad);
+}
+
+.flows tbody tr.pending td {
+  color: var(--fg-dim);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.m-read {
+  color: var(--fg-dim);
+}
+
+.m-write {
+  color: var(--accent);
+}
+
+.m-connect {
+  color: var(--redirect);
+}
+
+.st-ok {
+  color: var(--ok);
+}
+
+.st-redirect {
+  color: var(--redirect);
+}
+
+.st-client,
+.st-server,
+.st-error {
+  color: var(--bad);
+}
+
+.st-none {
+  color: var(--fg-dim);
+}
+
+.hosts td,
+.procs-table td,
+.conns td {
+  white-space: normal;
+}
+
+.hosts td:first-child {
+  white-space: nowrap;
+}
+
+.proc-detail td {
+  padding: 4px 8px 10px 40px;
+  background: var(--bg-2);
+}
+
+.conns th {
+  position: static;
+  background: none;
+}

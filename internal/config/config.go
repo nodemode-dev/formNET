@@ -9,6 +9,9 @@
 //	FORMNET_FLOW_LIMIT   flows kept in memory before the oldest are dropped; default 5000
 //	FORMNET_PASSTHROUGH  comma-separated host patterns tunnelled without interception
 //	FORMNET_MACHINE_INTERVAL  seconds between machine snapshots; default 2
+//	FORMNET_REVERSE_DNS  1 to look up names for remote addresses in the machine view; default off
+//	FORMNET_INTERCEPT    auto (open HTTPS only when the root is trusted), on, or off; default auto
+//	FORMNET_TOKEN        this run's session token; default a new random one, written to <data>/token
 //	FORMNET_DESKTOP      set by the desktop app; the server stops when its stdin closes
 package config
 
@@ -40,6 +43,9 @@ type Config struct {
 	FlowLimit       int
 	Passthrough     []string
 	MachineInterval time.Duration
+	ReverseDNS      bool
+	Intercept       string // auto, on, off
+	Token           string // empty means make one
 	Desktop         bool
 }
 
@@ -77,8 +83,23 @@ func load(getenv func(string) string, home func() (string, error)) (Config, erro
 	if err != nil {
 		return Config{}, fmt.Errorf("FORMNET_MACHINE_INTERVAL: %w", err)
 	}
+	intercept := strings.ToLower(strings.TrimSpace(getenv("FORMNET_INTERCEPT")))
+	switch intercept {
+	case "":
+		intercept = "auto"
+	case "auto", "on", "off":
+	default:
+		return Config{}, errors.New("FORMNET_INTERCEPT: must be auto, on or off")
+	}
+	token := strings.TrimSpace(getenv("FORMNET_TOKEN"))
+	if token != "" && len(token) < 16 {
+		return Config{}, errors.New("FORMNET_TOKEN: must be at least 16 characters")
+	}
 	return Config{
 		Data:            data,
+		ReverseDNS:      truthy(getenv("FORMNET_REVERSE_DNS")),
+		Intercept:       intercept,
+		Token:           token,
 		Addr:            addr,
 		ProxyAddr:       proxyAddr,
 		BodyLimit:       bodyLimit,
@@ -125,6 +146,14 @@ func positive(value string, fallback int64) (int64, error) {
 		return 0, errors.New("must be greater than zero")
 	}
 	return n, nil
+}
+
+func truthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 func splitList(value string) []string {

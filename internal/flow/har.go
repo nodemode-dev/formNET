@@ -3,6 +3,8 @@ package flow
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -56,7 +58,7 @@ type harRequest struct {
 type harPostData struct {
 	MimeType string `json:"mimeType"`
 	Text     string `json:"text"`
-	Encoding string `json:"encoding,omitempty"`
+	Comment  string `json:"comment,omitempty"`
 }
 
 type harResponse struct {
@@ -106,20 +108,77 @@ func MarshalHAR(flows []Flow, creatorVersion string) ([]byte, error) {
 	return json.MarshalIndent(ToHAR(flows, creatorVersion), "", "  ")
 }
 
+// HARWriter streams a HAR document entry by entry, so an export of thousands
+// of flows never holds more than one flow's bodies at a time.
+type HARWriter struct {
+	w     io.Writer
+	enc   *json.Encoder
+	count int
+	err   error
+}
+
+// NewHARWriter writes the document head and returns a writer for entries.
+func NewHARWriter(w io.Writer, creatorVersion string) (*HARWriter, error) {
+	head, err := json.Marshal(harCreator{Name: "formnet", Version: creatorVersion})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fmt.Fprintf(w, "{\n  \"log\": {\n    \"version\": \"1.2\",\n    \"creator\": %s,\n    \"entries\": [", head); err != nil {
+		return nil, err
+	}
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	return &HARWriter{w: w, enc: enc}, nil
+}
+
+// Write adds one flow; tunnels are skipped.
+func (h *HARWriter) Write(f Flow) error {
+	if h.err != nil || f.Kind == KindTunnel {
+		return h.err
+	}
+	sep := "\n"
+	if h.count > 0 {
+		sep = ",\n"
+	}
+	if _, err := io.WriteString(h.w, sep); err != nil {
+		h.err = err
+		return err
+	}
+	if err := h.enc.Encode(toEntry(f)); err != nil {
+		h.err = err
+		return err
+	}
+	h.count++
+	return nil
+}
+
+// Close writes the document tail.
+func (h *HARWriter) Close() error {
+	if h.err != nil {
+		return h.err
+	}
+	_, h.err = io.WriteString(h.w, "\n    ]\n  }\n}\n")
+	return h.err
+}
+
 func toEntry(f Flow) harEntry {
+	clientProto := f.ClientProtocol
+	if clientProto == "" {
+		clientProto = f.Protocol
+	}
 	req := harRequest{
 		Method:      f.Method,
 		URL:         f.URL,
-		HTTPVersion: f.Protocol,
+		HTTPVersion: clientProto,
 		Cookies:     []harNameValue{},
 		Headers:     nameValues(f.Request.Headers),
 		QueryString: queryValues(f.Query),
 		HeadersSize: sizeOrUnknown(f.Request.HeaderBytes),
-		BodySize:    sizeOrUnknown(f.Request.BodyBytes),
+		BodySize:    f.Request.BodyBytes,
 	}
 	if len(f.Request.Body) > 0 {
 		text, enc := bodyText(f.Request.Body)
-		req.PostData = &harPostData{MimeType: f.Request.ContentType, Text: text, Encoding: enc}
+		req.PostData = &harPostData{MimeType: f.Request.ContentType, Text: text, Comment: bodyComment(enc, f.Request)}
 	}
 	res := harResponse{
 		Status:      f.Status,
@@ -135,14 +194,14 @@ func toEntry(f Flow) harEntry {
 	if f.Response != nil {
 		res.Headers = nameValues(f.Response.Headers)
 		res.HeadersSize = sizeOrUnknown(f.Response.HeaderBytes)
-		res.BodySize = sizeOrUnknown(f.Response.BodyBytes)
-		res.Content = harContent{Size: f.Response.BodyBytes, MimeType: f.Response.ContentType}
+		res.BodySize = f.Response.BodyBytes
+		res.Content = harContent{Size: contentSize(*f.Response), MimeType: f.Response.ContentType}
 		res.RedirectURL = headerValue(f.Response.Headers, "Location")
 		if len(f.Response.Body) > 0 {
-			res.Content.Text, res.Content.Encoding = bodyText(f.Response.Body)
-			if f.Response.BodyTruncated {
-				res.Content.Comment = "truncated by formnet's body limit"
-			}
+			var enc string
+			res.Content.Text, enc = bodyText(f.Response.Body)
+			res.Content.Encoding = enc
+			res.Content.Comment = bodyComment(enc, *f.Response)
 		}
 	}
 	wait := f.TTFBMS
@@ -163,11 +222,36 @@ func toEntry(f Flow) harEntry {
 	return e
 }
 
+// sizeOrUnknown maps a header size formnet did not measure to HAR's -1.
 func sizeOrUnknown(n int64) int64 {
 	if n <= 0 {
 		return -1
 	}
 	return n
+}
+
+// contentSize is the decoded body size HAR asks for: the captured length when
+// the whole body was captured and decoded, else the wire size.
+func contentSize(m Message) int64 {
+	if m.Encoding != "" && !m.BodyTruncated && len(m.Body) > 0 {
+		return int64(len(m.Body))
+	}
+	return m.BodyBytes
+}
+
+// bodyComment explains a body that is not plain text as captured.
+func bodyComment(enc string, m Message) string {
+	var notes []string
+	if m.BodyTruncated {
+		notes = append(notes, "truncated by formnet's body limit")
+		if m.Encoding != "" {
+			notes = append(notes, "still "+m.Encoding+"-encoded")
+		}
+	}
+	if enc == "base64" {
+		notes = append(notes, "base64")
+	}
+	return strings.Join(notes, "; ")
 }
 
 func nameValues(h []Header) []harNameValue {
@@ -178,19 +262,22 @@ func nameValues(h []Header) []harNameValue {
 	return out
 }
 
+// queryValues splits a query in its original order; a pair that does not
+// unescape is kept as written rather than dropped.
 func queryValues(raw string) []harNameValue {
 	out := []harNameValue{}
 	if raw == "" {
 		return out
 	}
-	values, err := url.ParseQuery(raw)
-	if err != nil {
-		return out
-	}
-	for name, vs := range values {
-		for _, v := range vs {
-			out = append(out, harNameValue{Name: name, Value: v})
+	for _, pair := range strings.FieldsFunc(raw, func(r rune) bool { return r == '&' || r == ';' }) {
+		name, value, _ := strings.Cut(pair, "=")
+		if n, err := url.QueryUnescape(name); err == nil {
+			name = n
 		}
+		if v, err := url.QueryUnescape(value); err == nil {
+			value = v
+		}
+		out = append(out, harNameValue{Name: name, Value: value})
 	}
 	return out
 }

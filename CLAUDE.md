@@ -4,13 +4,13 @@ What a program actually does on the network, not what it promises: an intercepti
 
 ## Layout
 
-- `cmd/formnet/` the command: `serve` (default), `ca`, `snapshot`, `version`, `help`.
+- `cmd/formnet/` the command: `serve` (default), `url`, `open`, `ca`, `snapshot`, `version`, `help`.
 - `internal/config/` settings from `FORMNET_*` variables; both listeners are loopback-only and refuse anything else.
-- `internal/flow/` the record: `Flow`, the bounded `Store` with subscriptions, per-host summaries, the known-host labels (`classify.go`) and HAR export.
+- `internal/flow/` the record: `Flow`, the `Store` bounded by a flow count and a byte budget, with counted subscriptions and an epoch, per-host summaries, the known-host labels (`classify.go`) and a streaming HAR export.
 - `internal/ca/` the local root certificate (made on first run in the data folder) and per-host leaf certificates.
 - `internal/proxy/` the proxy: plain HTTP forwarding, CONNECT tunnels, TLS interception with the root, passthrough patterns, body capture up to the limit, byte and time accounting into the Store.
-- `internal/machine/` the connection table and owning processes per platform (lsof and nettop on macOS, /proc on Linux, netstat on Windows), polled on an interval; it also names the process behind a proxy client port.
-- `internal/server/` the loopback API, the server-sent event stream and the embedded client; the route list is in its package comment.
+- `internal/machine/` the connection table and owning processes per platform (lsof, ps and nettop on macOS, /proc on Linux, netstat on Windows), polled on an interval; it also names the process behind a proxy client port. Reverse DNS is off unless `FORMNET_REVERSE_DNS=1`.
+- `internal/server/` the loopback API, the server-sent event stream and the embedded client; the route list and the session rules are in its package comment. Every API call needs the run's session (cookie from `/?token=`, or a bearer header).
 - `web/` the client: vanilla TypeScript and Vite, no UI framework. `web/tests/window/` is the Playwright smoke CI runs.
 - `src-tauri/` the desktop window; it starts the server as a sidecar and waits for the `formnet desktop ready http://127.0.0.1:PORT/` line on stdout.
 - `assets/` repo-level art (logo). `deploy/` the draft formcompiler registry entry.
@@ -22,6 +22,9 @@ What a program actually does on the network, not what it promises: an intercepti
 ## Rules
 
 - Never listen on a non-loopback address. The proxy and the API carry the bodies of everything formnet sees.
+- Loopback is not a trust boundary: every program and user on the computer shares it. The API answers only with the run's session token (`FORMNET_TOKEN`, or the one written to `<data>/token` with mode 0600). Never add a route that serves recordings without it.
+- The proxy never connects to formnet's own addresses, and never to a loopback address reached through a host name (DNS rebinding into local services). Private ranges stay reachable; intranet hosts are legitimate.
+- HTTPS is opened only when the root is trusted (or `FORMNET_INTERCEPT=on`); otherwise it is tunnelled and counted, and the UI says so. Keep the wording and the behaviour in step.
 - The root certificate's private key never leaves the data folder (mode 0600) and is never served by any route. Only the certificate is downloadable.
 - Flows are values. Build a new `Flow` for every change and hand it to the Store; never edit a stored one in place.
 - Labels from `classify.go` are reading aids, not verdicts. Never present them as a judgement about a host.

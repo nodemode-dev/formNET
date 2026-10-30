@@ -22,8 +22,24 @@ func TestDefaults(t *testing.T) {
 	if cfg.BodyLimit != DefaultBodyLimit || cfg.FlowLimit != DefaultFlowLimit || cfg.MachineInterval != DefaultMachineInterval {
 		t.Fatalf("unexpected limits: %+v", cfg)
 	}
-	if cfg.Passthrough != nil || cfg.Desktop {
-		t.Fatalf("unexpected passthrough or desktop: %+v", cfg)
+	if cfg.Passthrough != nil || cfg.Desktop || cfg.ReverseDNS || cfg.Intercept != "auto" || cfg.Token != "" {
+		t.Fatalf("unexpected passthrough, desktop, reverse dns, intercept or token: %+v", cfg)
+	}
+}
+
+func TestInterceptTokenAndReverseDNS(t *testing.T) {
+	cfg, err := load(env(map[string]string{"FORMNET_INTERCEPT": "ON", "FORMNET_REVERSE_DNS": "yes", "FORMNET_TOKEN": "0123456789abcdef"}), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Intercept != "on" || !cfg.ReverseDNS || cfg.Token != "0123456789abcdef" {
+		t.Fatalf("%+v", cfg)
+	}
+	if _, err := load(env(map[string]string{"FORMNET_INTERCEPT": "maybe"}), home); err == nil {
+		t.Error("bad intercept accepted")
+	}
+	if _, err := load(env(map[string]string{"FORMNET_TOKEN": "short"}), home); err == nil {
+		t.Error("short token accepted")
 	}
 }
 

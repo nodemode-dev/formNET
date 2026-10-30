@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- formnet: a node with three arcs of traffic leaving it -->
+  <circle cx="148" cy="256" r="46" fill="#f97316"/>
+  <g fill="none" stroke="#f97316" stroke-width="34" stroke-linecap="round">
+    <path d="M 228 176 A 113 113 0 0 1 228 336"/>
+    <path d="M 290 118 A 195 195 0 0 1 290 394"/>
+    <path d="M 352 60 A 277 277 0 0 1 352 452"/>
+  </g>
+</svg>

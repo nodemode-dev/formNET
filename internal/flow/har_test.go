@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -62,3 +63,49 @@ func TestHARPendingFlowHasEmptyResponse(t *testing.T) {
 		t.Fatalf("%+v", h.Log.Entries)
 	}
 }
+
+func TestHARWriterStreamsEntries(t *testing.T) {
+	var buf strings.Builder
+	w, err := NewHARWriter(&buf, "v0.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := Flow{ID: "1", Kind: flowKindHTTP, Method: "GET", Protocol: "HTTP/2.0", ClientProtocol: "HTTP/1.1", Status: 200,
+		Response: &Message{Body: []byte("abc"), BodyBytes: 20, Encoding: "gzip"}}.WithURL("https://a.example/?b=2&a=1&x")
+	if err := w.Write(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write(Flow{ID: "t", Kind: KindTunnel}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write(Flow{ID: "2", Kind: flowKindHTTP, Method: "GET"}.WithURL("http://b.example/")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(buf.String()), &doc); err != nil {
+		t.Fatalf("not valid JSON: %v\n%s", err, buf.String())
+	}
+	log := doc["log"].(map[string]any)
+	entries := log["entries"].([]any)
+	if len(entries) != 2 || log["version"] != "1.2" {
+		t.Fatalf("entries %d version %v", len(entries), log["version"])
+	}
+	first := entries[0].(map[string]any)
+	req := first["request"].(map[string]any)
+	if req["httpVersion"] != "HTTP/1.1" || first["response"].(map[string]any)["httpVersion"] != "HTTP/2.0" {
+		t.Fatalf("protocols: %v", first)
+	}
+	qs := req["queryString"].([]any)
+	if len(qs) != 3 || qs[0].(map[string]any)["name"] != "b" || qs[2].(map[string]any)["name"] != "x" {
+		t.Fatalf("query order kept: %v", qs)
+	}
+	content := first["response"].(map[string]any)["content"].(map[string]any)
+	if content["size"].(float64) != 3 || first["response"].(map[string]any)["bodySize"].(float64) != 20 {
+		t.Fatalf("decoded size in content, wire size in bodySize: %v", content)
+	}
+}
+
+const flowKindHTTP = KindHTTP

@@ -18,13 +18,19 @@
 //	GET  /                         the web client
 //
 // Every request must carry a Host header for the loopback address (DNS
-// rebinding guard), and a POST must come from the page itself (Sec-Fetch-Site
-// same-origin or none, or a matching Origin), so no other site a browser has
-// open can read or change what formnet saw.
+// rebinding guard). Cross-site requests from a browser are refused on every
+// route but the page itself. The API, the stream and the certificate need a
+// session: the page is opened once at /?token=<the run's token> (printed by
+// `formnet serve`, or passed by the desktop app), the server answers with an
+// HttpOnly, SameSite=Strict cookie and redirects to /, and from then on the
+// cookie (or an Authorization: Bearer header, for scripts) is the session.
+// Loopback is shared by every program and user on the computer, and the
+// recordings hold other programs' secrets, so loopback alone is not enough.
 package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -66,9 +72,13 @@ type MachineSource interface {
 	Subscribe(ctx context.Context) <-chan machine.Snapshot
 }
 
+// SessionCookie is the cookie that carries the session.
+const SessionCookie = "formnet_session"
+
 // Deps are the parts the handler serves.
 type Deps struct {
 	Addr    string // the loopback address the server listens on, for the Host check
+	Token   string // the run's token; every API call needs it as a cookie or bearer
 	Store   *flow.Store
 	Proxy   ProxyControl
 	CA      CASource
@@ -77,10 +87,14 @@ type Deps struct {
 	Log     *slog.Logger
 }
 
-// Handler builds the API and client handler.
+// Handler builds the API and client handler. It panics without a token,
+// because serving the API open would hand every recording to any local program.
 func Handler(d Deps) http.Handler {
 	if d.Log == nil {
 		d.Log = slog.Default()
+	}
+	if len(d.Token) < 16 {
+		panic("server: a token of at least 16 characters is required")
 	}
 	s := &handler{Deps: d}
 	mux := http.NewServeMux()
@@ -106,12 +120,18 @@ type handler struct {
 	Deps
 }
 
-// guard refuses requests whose Host is not this server and cross-site writes.
+// guard refuses requests whose Host is not this server, cross-site requests
+// from a browser (on every route but the page itself), writes that do not
+// come from the page, and API calls without a session.
 func (s *handler) guard(next http.Handler) http.Handler {
 	port := portOf(s.Addr)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !hostAllowed(r.Host, port) {
 			writeError(w, http.StatusForbidden, "formnet answers only on its loopback address")
+			return
+		}
+		if crossSite(r) && !(r.URL.Path == "/" && r.Method == http.MethodGet) {
+			writeError(w, http.StatusForbidden, "cross-site requests are refused")
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r, port) {
@@ -121,8 +141,43 @@ func (s *handler) guard(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		if needsSession(r.URL.Path) && !s.hasSession(r) {
+			writeError(w, http.StatusUnauthorized, "no session: open formnet from the address printed by formnet serve, or run formnet open")
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func crossSite(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "cross-site", "same-site":
+		return true
+	}
+	return false
+}
+
+func needsSession(path string) bool {
+	return strings.HasPrefix(path, "/api/") || path == "/ca.pem"
+}
+
+func (s *handler) tokenMatches(candidate string) bool {
+	return candidate != "" && subtle.ConstantTimeCompare([]byte(candidate), []byte(s.Token)) == 1
+}
+
+// hasSession accepts the session cookie or a bearer token.
+func (s *handler) hasSession(r *http.Request) bool {
+	if c, err := r.Cookie(SessionCookie); err == nil && s.tokenMatches(c.Value) {
+		return true
+	}
+	if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		return s.tokenMatches(strings.TrimSpace(bearer))
+	}
+	return false
+}
+
+func (s *handler) setSession(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Value: s.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 }
 
 func portOf(addr string) string {
@@ -186,17 +241,18 @@ func (s *handler) health(w http.ResponseWriter, r *http.Request) {
 }
 
 type statusBody struct {
-	Product string           `json:"product"`
-	Version string           `json:"version"`
-	Addr    string           `json:"addr"`
-	Flows   int              `json:"flows"`
-	Proxy   proxy.Status     `json:"proxy"`
-	CA      ca.Info          `json:"ca"`
-	Machine machineStatus    `json:"machine"`
-	Now     time.Time        `json:"now"`
-	Hosts   int              `json:"hosts"`
-	Pending int              `json:"pending"`
-	Limits  map[string]int64 `json:"limits,omitempty"`
+	Product string        `json:"product"`
+	Version string        `json:"version"`
+	Addr    string        `json:"addr"`
+	Epoch   string        `json:"epoch"`
+	Flows   int           `json:"flows"`
+	Pending int           `json:"pending"`
+	Hosts   int           `json:"hosts"`
+	Store   flow.Stats    `json:"store"`
+	Proxy   proxy.Status  `json:"proxy"`
+	CA      ca.Info       `json:"ca"`
+	Machine machineStatus `json:"machine"`
+	Now     time.Time     `json:"now"`
 }
 
 type machineStatus struct {
@@ -210,14 +266,16 @@ type machineStatus struct {
 
 func (s *handler) status(w http.ResponseWriter, r *http.Request) {
 	snap := s.Machine.Latest()
-	pending := true
+	st := s.Store.Stats()
 	writeJSON(w, http.StatusOK, statusBody{
 		Product: app.Product,
 		Version: app.Version,
 		Addr:    s.Addr,
-		Flows:   s.Store.Len(),
-		Pending: len(s.Store.List(flow.Query{Pending: &pending})),
-		Hosts:   len(s.Store.Hosts()),
+		Epoch:   s.Store.Epoch(),
+		Flows:   st.Flows,
+		Pending: st.Pending,
+		Hosts:   st.Hosts,
+		Store:   st,
 		Proxy:   s.Proxy.Status(),
 		CA:      s.CA.Info(),
 		Machine: machineStatus{Supported: snap.Supported, Source: snap.Source, Taken: snap.Taken, Processes: len(snap.Processes), Connections: len(snap.Connections), Error: snap.Error},
@@ -378,23 +436,25 @@ func (s *handler) exportHAR(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// The list strips bodies; the export wants them, so re-read each flow.
+	// The list strips bodies; the export wants them, so each flow is re-read
+	// and written on its own, and the document never sits in memory whole.
 	listed := s.Store.List(q)
-	full := make([]flow.Flow, 0, len(listed))
-	for _, f := range listed {
-		if g, ok := s.Store.Get(f.ID); ok {
-			full = append(full, g)
-		}
-	}
-	raw, err := flow.MarshalHAR(full, app.Version)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not build the HAR")
-		return
-	}
 	name := "formnet-" + time.Now().UTC().Format("20060102-150405") + ".har"
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
-	_, _ = w.Write(raw)
+	hw, err := flow.NewHARWriter(w, app.Version)
+	if err != nil {
+		s.Log.Warn("har export", "err", err)
+		return
+	}
+	for _, f := range listed {
+		if g, ok := s.Store.Get(f.ID); ok {
+			if err := hw.Write(g); err != nil {
+				return
+			}
+		}
+	}
+	_ = hw.Close()
 }
 
 func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
@@ -407,7 +467,7 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 	ctx := r.Context()
-	flows := s.Store.Subscribe(ctx)
+	flows, dropped := s.Store.SubscribeCounted(ctx)
 	snaps := s.Machine.Subscribe(ctx)
 	send := func(event string, v any) bool {
 		raw, err := json.Marshal(v)
@@ -420,7 +480,8 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		return true
 	}
-	send("hello", map[string]any{"version": app.Version, "flows": s.Store.Len()})
+	send("hello", map[string]any{"version": app.Version, "flows": s.Store.Len(), "epoch": s.Store.Epoch(), "dropped": 0})
+	var told uint64
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -430,6 +491,14 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 		case e := <-flows:
 			if !send(string(e.Type), e) {
 				return
+			}
+			// Events this subscriber lost are reported once per gap, so the
+			// client reloads the list instead of trusting what it has.
+			if d := dropped(); d > told {
+				told = d
+				if !send("resync", map[string]any{"dropped": d}) {
+					return
+				}
 			}
 		case snap, ok := <-snaps:
 			if !ok {
@@ -447,21 +516,41 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// client serves the embedded web client, falling back to index.html for
-// paths without a file so the page can own its routes.
+const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
+
+// client serves the embedded web client. Static files need no session; the
+// page itself exchanges ?token= for the session cookie and otherwise needs it.
+// Paths without a file fall back to index.html so the page can own its routes.
 func (s *handler) client() http.Handler {
 	files := http.FS(s.Dist)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := path.Clean("/" + r.URL.Path)
-		if name != "/" {
+		if name != "/" && name != "/index.html" {
 			if f, err := s.Dist.Open(strings.TrimPrefix(name, "/")); err == nil {
+				info, statErr := f.Stat()
 				_ = f.Close()
-				if strings.HasPrefix(name, "/assets/") {
-					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				if statErr == nil && !info.IsDir() {
+					if strings.HasPrefix(name, "/assets/") {
+						w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+					}
+					w.Header().Set("Content-Security-Policy", csp)
+					http.FileServer(files).ServeHTTP(w, r)
+					return
 				}
-				http.FileServer(files).ServeHTTP(w, r)
+			}
+		}
+		if token := r.URL.Query().Get("token"); token != "" {
+			if !s.tokenMatches(token) {
+				s.noSession(w, http.StatusForbidden)
 				return
 			}
+			s.setSession(w)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		if !s.hasSession(r) {
+			s.noSession(w, http.StatusUnauthorized)
+			return
 		}
 		index, err := s.Dist.Open("index.html")
 		if err != nil {
@@ -470,7 +559,19 @@ func (s *handler) client() http.Handler {
 		}
 		defer index.Close()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", csp)
 		_, _ = io.Copy(w, index)
 	})
+}
+
+const noSessionPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>formnet</title>
+<meta name="color-scheme" content="dark light"><style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5}code{font-family:ui-monospace,monospace}</style></head>
+<body><h1>formnet</h1><p>This page has no session. formnet answers only to the page it opened itself, so that no other program on this computer can read the recordings.</p>
+<p>Open formnet from the address printed by <code>formnet serve</code> (it carries this run's token), or run <code>formnet open</code>.</p></body></html>`
+
+func (s *handler) noSession(w http.ResponseWriter, status int) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Security-Policy", csp)
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, noSessionPage)
 }

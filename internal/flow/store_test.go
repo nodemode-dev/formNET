@@ -198,3 +198,81 @@ func TestWithURL(t *testing.T) {
 		t.Fatalf("default port: %+v", g)
 	}
 }
+
+func TestByteBudgetEvictsOldestBodies(t *testing.T) {
+	s := NewStoreWithBudget(100, 1000)
+	big := func(id string, n int) Flow {
+		f := sample(id, id+".example")
+		f.Request.Body = make([]byte, n)
+		return f
+	}
+	s.Add(big("a", 400))
+	s.Add(big("b", 400))
+	if st := s.Stats(); st.Flows != 2 || st.Bytes != 800 || st.Budget != 1000 || st.Limit != 100 {
+		t.Fatalf("stats: %+v", st)
+	}
+	s.Add(big("c", 400))
+	if _, ok := s.Get("a"); ok {
+		t.Fatal("the oldest flow should be evicted when the budget is exceeded")
+	}
+	if st := s.Stats(); st.Flows != 2 || st.Bytes != 800 {
+		t.Fatalf("stats after eviction: %+v", st)
+	}
+	// An update that grows a body counts too, and the newest flow is always kept.
+	c, _ := s.Get("c")
+	c.Response = &Message{Body: make([]byte, 5000)}
+	s.Update(c)
+	if st := s.Stats(); st.Flows != 1 || st.Bytes != 5400 {
+		t.Fatalf("stats after a large update: %+v", st)
+	}
+	s.Clear()
+	if st := s.Stats(); st.Bytes != 0 || st.Flows != 0 {
+		t.Fatalf("stats after clear: %+v", st)
+	}
+}
+
+func TestStatsCountsPendingAndHosts(t *testing.T) {
+	s := NewStore(10)
+	s.Add(sample("1", "a.example"))
+	done := sample("2", "a.example")
+	done.Pending = false
+	s.Add(done)
+	s.Add(sample("3", "b.example"))
+	if st := s.Stats(); st.Flows != 3 || st.Pending != 2 || st.Hosts != 2 {
+		t.Fatalf("stats: %+v", st)
+	}
+	if len(s.Epoch()) < 8 || s.Epoch() == NewStore(1).Epoch() {
+		t.Fatalf("epoch should be a random string per store: %q", s.Epoch())
+	}
+}
+
+func TestCountedSubscriberReportsDrops(t *testing.T) {
+	s := NewStore(10000)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch, dropped := s.SubscribeCounted(ctx)
+	for i := 0; i < 300; i++ {
+		s.Add(sample(itoa(i), "a.example"))
+	}
+	if d := dropped(); d != 44 {
+		t.Fatalf("dropped %d events, want 44 (300 minus the 256 buffered)", d)
+	}
+	if len(ch) != 256 {
+		t.Fatalf("buffered %d", len(ch))
+	}
+}
+
+func TestDomainKeepsIPsAndKnownRegistries(t *testing.T) {
+	cases := map[string]string{"10.0.0.1": "10.0.0.1", "[::1]": "[::1]", "api.abc.io": "abc.io", "www.bbc.co.uk": "bbc.co.uk", "a.b.ne.jp": "b.ne.jp"}
+	for host, want := range cases {
+		if got := Domain(host); got != want {
+			t.Errorf("Domain(%q) = %q, want %q", host, got, want)
+		}
+	}
+	if c, o := Classify("cdnjs.cloudflare.com"); c != "cdn" || o != "Cloudflare" {
+		t.Errorf("cdnjs: %q %q", c, o)
+	}
+	if c, _ := Classify("connect.facebook.net"); c == "tracking" {
+		t.Error("labels must read as roles, not verdicts")
+	}
+}

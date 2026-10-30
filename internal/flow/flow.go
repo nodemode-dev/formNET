@@ -7,6 +7,7 @@
 package flow
 
 import (
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ const (
 	KindWebSocket = "websocket" // an upgrade the proxy forwarded: headers, then byte counts
 )
 
-// Header is one header line, kept in wire order because order is part of what a client sends.
+// Header is one header line. Names are sorted (net/http keeps no wire order); the values of one name keep their order.
 type Header struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
@@ -57,14 +58,15 @@ type Flow struct {
 	ClientPID     int    `json:"client_pid,omitempty"`     // the owner of that port, when the machine view knows it
 	ClientProcess string `json:"client_process,omitempty"` // its name
 
-	Scheme   string `json:"scheme"`
-	Method   string `json:"method"`
-	Host     string `json:"host"` // host without port
-	Port     int    `json:"port"`
-	Path     string `json:"path"`
-	Query    string `json:"query"`
-	URL      string `json:"url"`
-	Protocol string `json:"protocol"` // HTTP/1.1, HTTP/2.0
+	Scheme         string `json:"scheme"`
+	Method         string `json:"method"`
+	Host           string `json:"host"` // host without port
+	Port           int    `json:"port"`
+	Path           string `json:"path"`
+	Query          string `json:"query"`
+	URL            string `json:"url"`
+	Protocol       string `json:"protocol"`                  // what the upstream answered with: HTTP/1.1, HTTP/2.0
+	ClientProtocol string `json:"client_protocol,omitempty"` // what the program sent to the proxy
 
 	TLS      *TLSInfo `json:"tls,omitempty"`
 	Request  Message  `json:"request"`
@@ -94,26 +96,30 @@ func (f Flow) Completed(end time.Time) Flow {
 	return out
 }
 
+// secondLevel lists the labels that sit under a country-code TLD as a public
+// registry (co.uk, com.au, ne.jp), so three labels make the domain there.
+var secondLevel = map[string]bool{"co": true, "com": true, "org": true, "net": true, "gov": true, "edu": true, "ac": true, "ne": true, "or": true, "go": true}
+
 // Domain is the registrable-looking tail of a host: the last two labels, or
-// three when the second is a short country-code style label (co.uk, com.au).
-// It groups subdomains of one owner without a public suffix list.
+// three when the host ends in a known second-level registry under a two-letter
+// TLD. IP addresses are returned as they are. It groups subdomains of one
+// owner without a public suffix list, so it is a grouping aid, not a rule.
 func Domain(host string) string {
 	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	if host == "" {
-		return ""
+	if host == "" || net.ParseIP(strings.Trim(host, "[]")) != nil {
+		return host
 	}
 	parts := strings.Split(host, ".")
 	if len(parts) <= 2 {
 		return host
 	}
-	second := parts[len(parts)-2]
-	if len(second) <= 3 && len(parts[len(parts)-1]) == 2 {
+	if secondLevel[parts[len(parts)-2]] && len(parts[len(parts)-1]) == 2 {
 		return strings.Join(parts[len(parts)-3:], ".")
 	}
 	return strings.Join(parts[len(parts)-2:], ".")
 }
 
-// ParseURL fills Scheme, Host, Port, Path and Query from a URL string.
+// WithURL fills URL, Scheme, Host, Port, Path and Query from a URL string.
 func (f Flow) WithURL(raw string) Flow {
 	out := f
 	u, err := url.Parse(raw)

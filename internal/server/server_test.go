@@ -43,6 +43,8 @@ func (m *fakeMachine) Latest() machine.Snapshot {
 }
 func (m *fakeMachine) Subscribe(ctx context.Context) <-chan machine.Snapshot { return m.ch }
 
+const testToken = "0123456789abcdef0123456789abcdef"
+
 func newTest(t *testing.T) (*httptest.Server, *flow.Store, *fakeProxy) {
 	t.Helper()
 	store := flow.NewStore(100)
@@ -52,7 +54,7 @@ func newTest(t *testing.T) (*httptest.Server, *flow.Store, *fakeProxy) {
 		"assets/app.js": {Data: []byte("console.log(1)")},
 		"favicon.svg":   {Data: []byte("<svg/>")},
 	}
-	h := Handler(Deps{Addr: "127.0.0.1:8760", Store: store, Proxy: p, CA: fakeCA{}, Machine: &fakeMachine{ch: make(chan machine.Snapshot, 1)}, Dist: dist})
+	h := Handler(Deps{Addr: "127.0.0.1:8760", Token: testToken, Store: store, Proxy: p, CA: fakeCA{}, Machine: &fakeMachine{ch: make(chan machine.Snapshot, 1)}, Dist: dist})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv, store, p
@@ -66,6 +68,7 @@ func do(t *testing.T, srv *httptest.Server, method, path string, body string, he
 		t.Fatal(err)
 	}
 	req.Host = "127.0.0.1:8760"
+	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: testToken})
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -208,6 +211,7 @@ func TestStreamDeliversFlowEvents(t *testing.T) {
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/stream", nil)
 	req.Host = "127.0.0.1:8760"
+	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: testToken})
 	res, err := srv.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +231,7 @@ func TestStreamDeliversFlowEvents(t *testing.T) {
 			t.Fatalf("stream ended: %v\n%s", err, got)
 		}
 	}
-	if !strings.Contains(got, "event: hello") || !strings.Contains(got, `"id":"s1"`) {
+	if !strings.Contains(got, "event: hello") || !strings.Contains(got, `"epoch":"`) || !strings.Contains(got, `"id":"s1"`) {
 		t.Fatalf("stream:\n%s", got)
 	}
 }
@@ -251,4 +255,101 @@ func TestClientServesIndexAssetsAndFallback(t *testing.T) {
 	if res := do(t, srv, http.MethodGet, "/api/nothing", "", nil); res.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown api route: %d", res.StatusCode)
 	}
+}
+
+// bare sends a request with the right Host but no session.
+func bare(t *testing.T, srv *httptest.Server, method, path string, headers map[string]string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, srv.URL+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "127.0.0.1:8760"
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestSessionRequiredForAPIAndCertificate(t *testing.T) {
+	srv, _, _ := newTest(t)
+	for _, p := range []string{"/api/status", "/api/flows", "/api/stream", "/ca.pem", "/api/export/har"} {
+		res := bare(t, srv, http.MethodGet, p, nil)
+		if res.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("%s without a session: %d", p, res.StatusCode)
+		}
+	}
+	res := bare(t, srv, http.MethodGet, "/", nil)
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "formnet open") {
+		t.Fatalf("page without a session: %d %q", res.StatusCode, body)
+	}
+	if res := bare(t, srv, http.MethodGet, "/assets/app.js", nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("static files need no session: %d", res.StatusCode)
+	}
+	if res := bare(t, srv, http.MethodGet, "/healthz", nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("healthz needs no session: %d", res.StatusCode)
+	}
+	if res := bare(t, srv, http.MethodGet, "/api/status", map[string]string{"Authorization": "Bearer " + testToken}); res.StatusCode != http.StatusOK {
+		t.Fatalf("bearer token: %d", res.StatusCode)
+	}
+	if res := bare(t, srv, http.MethodGet, "/api/status", map[string]string{"Authorization": "Bearer wrong"}); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong bearer: %d", res.StatusCode)
+	}
+}
+
+func TestTokenExchangeSetsCookieAndRedirects(t *testing.T) {
+	srv, _, _ := newTest(t)
+	res := bare(t, srv, http.MethodGet, "/?token="+testToken, nil)
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/" {
+		t.Fatalf("exchange: %d %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	var cookie *http.Cookie
+	for _, c := range res.Cookies() {
+		if c.Name == SessionCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil || cookie.Value != testToken || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
+		t.Fatalf("cookie: %+v", cookie)
+	}
+	if res := bare(t, srv, http.MethodGet, "/?token=wrong0000000000000000", nil); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("wrong token: %d", res.StatusCode)
+	}
+	if res := bare(t, srv, http.MethodGet, "/?token=", nil); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("empty token: %d", res.StatusCode)
+	}
+}
+
+func TestCrossSiteReadsRefused(t *testing.T) {
+	srv, _, _ := newTest(t)
+	for _, p := range []string{"/api/export/har", "/ca.pem", "/api/flows"} {
+		res := do(t, srv, http.MethodGet, p, "", map[string]string{"Sec-Fetch-Site": "cross-site"})
+		if res.StatusCode != http.StatusForbidden {
+			t.Fatalf("cross-site %s: %d", p, res.StatusCode)
+		}
+	}
+	if res := do(t, srv, http.MethodGet, "/", "", map[string]string{"Sec-Fetch-Site": "cross-site"}); res.StatusCode != http.StatusOK {
+		t.Fatalf("a cross-site navigation to the page itself is allowed: %d", res.StatusCode)
+	}
+	if res := do(t, srv, http.MethodGet, "/assets", "", nil); res.StatusCode == http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		if strings.Contains(string(body), "<pre>") {
+			t.Fatal("directory listing served")
+		}
+	}
+}
+
+func TestHandlerRefusesShortToken(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("a short token must be refused")
+		}
+	}()
+	Handler(Deps{Addr: "127.0.0.1:8760", Token: "short", Store: flow.NewStore(1), Proxy: &fakeProxy{}, CA: fakeCA{}, Machine: &fakeMachine{}, Dist: fstest.MapFS{}})
 }

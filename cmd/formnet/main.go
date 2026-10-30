@@ -5,6 +5,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +15,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -47,6 +52,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return caCommand(args[1:], stdout, stderr)
 	case "snapshot":
 		return snapshot(stdout, stderr)
+	case "url":
+		return printURL(stdout, stderr)
+	case "open":
+		return openBrowser(stdout, stderr)
 	case "help", "--help", "-h":
 		usage(stdout)
 		return 0
@@ -61,6 +70,8 @@ func usage(w io.Writer) {
 	fmt.Fprint(w, `usage: formnet [command]
 
   serve            start the proxy, the machine view and the web client (the default)
+  url              print the address of the running formnet, with this run's session token
+  open             open that address in the browser
   ca               print the root certificate's path, fingerprint and trust state
   ca export PATH   write the root certificate (PEM) to PATH
   ca trust         print the command that makes this computer trust the root
@@ -75,7 +86,14 @@ Settings (environment):
   FORMNET_BODY_LIMIT        bytes of each body kept; default 262144
   FORMNET_FLOW_LIMIT        flows kept in memory; default 5000
   FORMNET_PASSTHROUGH       hosts tunnelled without interception, comma-separated
+  FORMNET_INTERCEPT         auto (open HTTPS once the root is trusted), on, or off; default auto
   FORMNET_MACHINE_INTERVAL  seconds between machine snapshots; default 2
+  FORMNET_REVERSE_DNS       1 to name remote addresses in the machine view (sends PTR queries); default off
+  FORMNET_TOKEN             this run's session token; default a new one, kept in <data>/token
+
+The web client answers only to a page opened with the session token: use the
+address "formnet serve" prints, or run "formnet open". Scripts send the token
+as "Authorization: Bearer <token>".
 
 Point a program at the proxy, for example:
   curl -x http://127.0.0.1:8761 --cacert ~/formnet/ca.pem https://example.com/
@@ -114,8 +132,16 @@ func serve(stdout, stderr io.Writer) int {
 		}()
 	}
 
+	token, err := sessionToken(cfg)
+	if err != nil {
+		log.Error("session token", "err", err)
+		return 1
+	}
+	info := authority.Info()
+	intercept := cfg.Intercept == "on" || (cfg.Intercept == "auto" && info.Trusted)
+
 	store := flow.NewStore(cfg.FlowLimit)
-	monitor := machine.NewMonitor(cfg.MachineInterval, log)
+	monitor := machine.NewMonitorWithOptions(machine.Options{Interval: cfg.MachineInterval, Log: log, ReverseDNS: cfg.ReverseDNS})
 	go monitor.Run(ctx)
 
 	px := proxy.New(proxy.Options{
@@ -123,8 +149,9 @@ func serve(stdout, stderr io.Writer) int {
 		Store:       store,
 		BodyLimit:   cfg.BodyLimit,
 		Passthrough: cfg.Passthrough,
-		Intercept:   true,
+		Intercept:   intercept,
 		Owner:       monitor.Owner,
+		Refuse:      []string{cfg.Addr, cfg.ProxyAddr},
 		Log:         log,
 	})
 	proxyErr := make(chan error, 1)
@@ -136,35 +163,138 @@ func serve(stdout, stderr io.Writer) int {
 		return 1
 	}
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: cfg.Addr, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log}),
+		Handler:           server.Handler(server.Deps{Addr: cfg.Addr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log}),
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       90 * time.Second,
 	}
 	apiErr := make(chan error, 1)
 	go func() { apiErr <- api.Serve(ln) }()
 
-	info := authority.Info()
-	log.Info("formnet", "version", app.Version, "ui", "http://"+cfg.Addr, "proxy", cfg.ProxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted)
-	if !info.Trusted {
-		log.Info("the root certificate is not trusted yet; HTTPS is counted but not opened", "run", "formnet ca trust")
+	if err := waitForProxy(px, proxyErr); err != nil {
+		log.Error("proxy", "addr", cfg.ProxyAddr, "err", err)
+		return 1
+	}
+	log.Info("formnet", "version", app.Version, "open", sessionURL(cfg.Addr, token), "proxy", cfg.ProxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted, "intercept", intercept)
+	switch {
+	case !info.Trusted && !intercept:
+		log.Info("the root certificate is not trusted yet, so HTTPS is counted but not opened", "run", "formnet ca trust")
+	case !info.Trusted && intercept:
+		log.Info("HTTPS is opened although the root is not trusted; programs that verify certificates will refuse the proxy", "run", "formnet ca trust")
 	}
 	// The desktop app waits for this line before it opens its window.
 	fmt.Fprintf(stdout, "formnet desktop ready http://%s/\n", cfg.Addr)
 
+	code := 0
 	select {
 	case <-ctx.Done():
 	case err := <-proxyErr:
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("proxy stopped", "err", err)
-			stop()
+			code = 1
 		}
 	case err := <-apiErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("api stopped", "err", err)
+			code = 1
 		}
 	}
+	stop()
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = api.Shutdown(shutdown)
+	return code
+}
+
+// waitForProxy returns once the proxy is listening, or with its error.
+func waitForProxy(px *proxy.Proxy, errs <-chan error) error {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-errs:
+			if err == nil {
+				err = errors.New("stopped before it was ready")
+			}
+			return err
+		default:
+		}
+		if px.Status().Running {
+			return nil
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return errors.New("not listening after 5 seconds")
+}
+
+const tokenFile = "token"
+
+// sessionToken uses the configured token or makes one for this run, keeping
+// it in the data folder (owner-readable only) for `formnet url` and `open`.
+func sessionToken(cfg config.Config) (string, error) {
+	token := cfg.Token
+	if token == "" {
+		var b [24]byte
+		if _, err := rand.Read(b[:]); err != nil {
+			return "", err
+		}
+		token = hex.EncodeToString(b[:])
+	}
+	path := filepath.Join(cfg.Data, tokenFile)
+	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return "", fmt.Errorf("chmod %s: %w", path, err)
+	}
+	return token, nil
+}
+
+func sessionURL(addr, token string) string {
+	return "http://" + addr + "/?token=" + token
+}
+
+// currentURL reads the token the running formnet wrote.
+func currentURL(stderr io.Writer) (string, bool) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintln(stderr, "formnet:", err)
+		return "", false
+	}
+	raw, err := os.ReadFile(filepath.Join(cfg.Data, tokenFile))
+	if err != nil {
+		fmt.Fprintln(stderr, "formnet: no session token found; is formnet serve running with this data folder?")
+		return "", false
+	}
+	return sessionURL(cfg.Addr, strings.TrimSpace(string(raw))), true
+}
+
+func printURL(stdout, stderr io.Writer) int {
+	url, ok := currentURL(stderr)
+	if !ok {
+		return 1
+	}
+	fmt.Fprintln(stdout, url)
+	return 0
+}
+
+func openBrowser(stdout, stderr io.Writer) int {
+	url, ok := currentURL(stderr)
+	if !ok {
+		return 1
+	}
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("/usr/bin/open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(stderr, "formnet: could not open a browser (%v); open this yourself:\n%s\n", err, url)
+		return 1
+	}
+	fmt.Fprintln(stdout, url)
 	return 0
 }
 

@@ -9,6 +9,7 @@ build: web server
 
 web:
 	test -d web/node_modules || ./web/oc_install
+	rm -rf web/dist/assets web/dist/index.html web/dist/favicon.svg
 	cd web && npm run build
 
 server:

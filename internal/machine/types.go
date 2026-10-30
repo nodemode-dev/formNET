@@ -27,15 +27,19 @@ type Process struct {
 
 // Connection is one socket with a remote end.
 type Connection struct {
-	Proto      string    `json:"proto"` // tcp, tcp6, udp, udp6
-	PID        int       `json:"pid"`
-	Process    string    `json:"process"`
-	Local      string    `json:"local"`  // ip:port
-	Remote     string    `json:"remote"` // ip:port; empty for a listening socket
-	RemoteHost string    `json:"remote_host,omitempty"`
-	State      string    `json:"state"` // ESTABLISHED, LISTEN, ...
-	FirstSeen  time.Time `json:"first_seen"`
-	LastSeen   time.Time `json:"last_seen"`
+	Proto   string `json:"proto"` // tcp, tcp6, udp, udp6
+	PID     int    `json:"pid"`
+	Process string `json:"process"`        // the name the process reports for itself
+	Path    string `json:"path,omitempty"` // its executable, when the platform tells
+	Local   string `json:"local"`          // ip:port
+	Remote  string `json:"remote"`         // ip:port; empty for a listening socket
+	// RemoteHost is the reverse DNS name, only when reverse DNS is turned on.
+	// RemoteHostVerified is true when a forward lookup of that name gave the IP back.
+	RemoteHost         string    `json:"remote_host,omitempty"`
+	RemoteHostVerified bool      `json:"remote_host_verified,omitempty"`
+	State              string    `json:"state"` // ESTABLISHED, LISTEN, ...
+	FirstSeen          time.Time `json:"first_seen"`
+	LastSeen           time.Time `json:"last_seen"`
 }
 
 // Snapshot is the machine's connection table at one instant.

@@ -1,0 +1,117 @@
+use std::sync::Mutex;
+
+use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItemBuilder, SubmenuBuilder};
+use tauri::{AppHandle, Manager, Runtime};
+
+pub struct Zoom(pub Mutex<f64>);
+
+const ZOOM_STEPS: [f64; 9] = [0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75];
+
+fn item<R: Runtime>(app: &AppHandle<R>, id: &str, label: &str, keys: Option<&str>) -> tauri::Result<tauri::menu::MenuItem<R>> {
+    let mut b = MenuItemBuilder::with_id(id, label);
+    if let Some(k) = keys {
+        b = b.accelerator(k);
+    }
+    b.build(app)
+}
+
+pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let app_menu = SubmenuBuilder::new(app, "formnet")
+        .about(None)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+    let file = SubmenuBuilder::new(app, "File")
+        .item(&item(app, "cmd:flows.exportHar", "Export HAR...", Some("CmdOrCtrl+S"))?)
+        .item(&item(app, "cmd:ca.download", "Download Root Certificate...", None)?)
+        .separator()
+        .item(&item(app, "cmd:flows.clear", "Clear Recording", Some("CmdOrCtrl+K"))?)
+        .separator()
+        .close_window()
+        .build()?;
+    let edit = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .separator()
+        .item(&item(app, "cmd:flows.filter", "Filter...", Some("CmdOrCtrl+F"))?)
+        .build()?;
+    let view = SubmenuBuilder::new(app, "View")
+        .item(&item(app, "cmd:view.flows", "Flows", Some("CmdOrCtrl+1"))?)
+        .item(&item(app, "cmd:view.hosts", "Hosts", Some("CmdOrCtrl+2"))?)
+        .item(&item(app, "cmd:view.machine", "Machine", Some("CmdOrCtrl+3"))?)
+        .separator()
+        .item(&item(app, "cmd:shell.theme.toggle", "Toggle Dark Mode", Some("CmdOrCtrl+Shift+L"))?)
+        .separator()
+        .item(&item(app, "zoom:in", "Zoom In", Some("CmdOrCtrl+="))?)
+        .item(&item(app, "zoom:out", "Zoom Out", Some("CmdOrCtrl+-"))?)
+        .item(&item(app, "zoom:reset", "Actual Size", Some("CmdOrCtrl+0"))?)
+        .separator()
+        .item(&item(app, "app:reload", "Reload", Some("CmdOrCtrl+R"))?)
+        .fullscreen()
+        .build()?;
+    let window = SubmenuBuilder::new(app, "Window")
+        .minimize()
+        .maximize()
+        .separator()
+        .bring_all_to_front()
+        .build()?;
+    let help = SubmenuBuilder::new(app, "Help")
+        .item(&item(app, "cmd:help.proxySetup", "Proxy Setup...", None)?)
+        .item(&item(app, "cmd:help.trustRoot", "Trust the Root Certificate...", None)?)
+        .separator()
+        .item(&item(app, "app:readme", "formnet on GitHub", None)?)
+        .build()?;
+    MenuBuilder::new(app)
+        .items(&[&app_menu, &file, &edit, &view, &window, &help])
+        .build()
+}
+
+fn step(current: f64, up: bool) -> f64 {
+    if up {
+        ZOOM_STEPS.iter().copied().find(|z| *z > current + 0.001).unwrap_or(current)
+    } else {
+        ZOOM_STEPS.iter().rev().copied().find(|z| *z < current - 0.001).unwrap_or(current)
+    }
+}
+
+pub fn handle<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let id = event.id().as_ref();
+    if let Some(command) = id.strip_prefix("cmd:") {
+        let js = format!("window.__formnetRun && window.__formnetRun({command:?})");
+        let _ = window.eval(js);
+        return;
+    }
+    match id {
+        "zoom:in" | "zoom:out" | "zoom:reset" => {
+            let zoom = app.state::<Zoom>();
+            let mut z = zoom.0.lock().unwrap();
+            *z = match id {
+                "zoom:in" => step(*z, true),
+                "zoom:out" => step(*z, false),
+                _ => 1.0,
+            };
+            let _ = window.set_zoom(*z);
+        }
+        "app:reload" => {
+            let _ = window.eval("location.reload()");
+        }
+        "app:readme" => {
+            let _ = window.eval("window.open('https://github.com/nodemode-dev/formnet')");
+        }
+        _ => {}
+    }
+}

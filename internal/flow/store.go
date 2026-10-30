@@ -2,9 +2,13 @@ package flow
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,67 +39,143 @@ type Query struct {
 	Limit    int // 0 means every match
 }
 
-// Store keeps the newest flows in arrival order, dropping the oldest past its limit.
-type Store struct {
-	limit int
+// DefaultByteBudget bounds the captured bodies kept in memory.
+const DefaultByteBudget int64 = 256 << 20
 
-	mu     sync.RWMutex
-	seq    uint64
-	order  []string // ids in arrival order
-	byID   map[string]*Flow
-	subs   map[chan Event]struct{}
-	hostFn func(string) string
+// Store keeps the newest flows in arrival order, dropping the oldest past its
+// flow limit or its byte budget (the captured bodies of every kept flow).
+type Store struct {
+	limit  int
+	budget int64
+	epoch  string
+
+	mu    sync.RWMutex
+	seq   uint64
+	order []string // ids in arrival order
+	byID  map[string]*Flow
+	bytes int64 // captured body bytes across kept flows
+	subs  map[*subscriber]struct{}
 }
 
-// NewStore keeps at most limit flows.
+type subscriber struct {
+	ch      chan Event
+	dropped atomic.Uint64
+}
+
+// NewStore keeps at most limit flows and DefaultByteBudget of captured bodies.
 func NewStore(limit int) *Store {
+	return NewStoreWithBudget(limit, DefaultByteBudget)
+}
+
+// NewStoreWithBudget keeps at most limit flows and budget bytes of captured bodies.
+func NewStoreWithBudget(limit int, budget int64) *Store {
 	if limit <= 0 {
 		limit = 1
 	}
-	return &Store{limit: limit, byID: map[string]*Flow{}, subs: map[chan Event]struct{}{}}
+	if budget <= 0 {
+		budget = DefaultByteBudget
+	}
+	return &Store{limit: limit, budget: budget, epoch: newEpoch(), byID: map[string]*Flow{}, subs: map[*subscriber]struct{}{}}
+}
+
+func newEpoch() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// Epoch identifies this store's lifetime; a client that sees a new epoch
+// reloads instead of asking for flows since a sequence number it remembers.
+func (s *Store) Epoch() string { return s.epoch }
+
+func captured(f *Flow) int64 {
+	n := int64(len(f.Request.Body))
+	if f.Response != nil {
+		n += int64(len(f.Response.Body))
+	}
+	return n
 }
 
 // Add stores a new flow (assigning its Seq) or, when the id is known, replaces it.
+// Events are published under the lock so subscribers see them in store order.
 func (s *Store) Add(f Flow) Flow {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if existing, ok := s.byID[f.ID]; ok {
-		f.Seq = existing.Seq
-		s.byID[f.ID] = &f
-		s.mu.Unlock()
-		s.publish(Event{Type: EventUpdated, Flow: &f})
+		s.replaceLocked(existing, &f)
+		s.publishLocked(Event{Type: EventUpdated, Flow: &f})
 		return f
 	}
 	s.seq++
 	f.Seq = s.seq
 	s.byID[f.ID] = &f
 	s.order = append(s.order, f.ID)
+	s.bytes += captured(&f)
 	s.evictLocked()
-	s.mu.Unlock()
-	s.publish(Event{Type: EventAdded, Flow: &f})
+	s.publishLocked(Event{Type: EventAdded, Flow: &f})
 	return f
 }
 
 // Update replaces a stored flow. A flow that was already evicted is dropped, not re-added.
 func (s *Store) Update(f Flow) (Flow, bool) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	existing, ok := s.byID[f.ID]
 	if !ok {
-		s.mu.Unlock()
 		return f, false
 	}
-	f.Seq = existing.Seq
-	s.byID[f.ID] = &f
-	s.mu.Unlock()
-	s.publish(Event{Type: EventUpdated, Flow: &f})
+	s.replaceLocked(existing, &f)
+	s.evictLocked()
+	s.publishLocked(Event{Type: EventUpdated, Flow: &f})
 	return f, true
 }
 
+func (s *Store) replaceLocked(old, now *Flow) {
+	now.Seq = old.Seq
+	s.bytes += captured(now) - captured(old)
+	s.byID[now.ID] = now
+}
+
+// evictLocked drops the oldest flows while the store is over its flow limit
+// or its byte budget. The newest flow is always kept.
 func (s *Store) evictLocked() {
-	for len(s.order) > s.limit {
+	for len(s.order) > 1 && (len(s.order) > s.limit || s.bytes > s.budget) {
 		id := s.order[0]
 		s.order = s.order[1:]
-		delete(s.byID, id)
+		if f, ok := s.byID[id]; ok {
+			s.bytes -= captured(f)
+			delete(s.byID, id)
+		}
 	}
+}
+
+// Stats counts what the store holds in one pass.
+type Stats struct {
+	Flows   int   `json:"flows"`
+	Pending int   `json:"pending"`
+	Hosts   int   `json:"hosts"`
+	Bytes   int64 `json:"captured_bytes"`
+	Budget  int64 `json:"byte_budget"`
+	Limit   int   `json:"flow_limit"`
+}
+
+// Stats returns counts without copying flows.
+func (s *Store) Stats() Stats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	st := Stats{Flows: len(s.order), Bytes: s.bytes, Budget: s.budget, Limit: s.limit}
+	hosts := map[string]struct{}{}
+	for _, id := range s.order {
+		f := s.byID[id]
+		if f.Pending {
+			st.Pending++
+		}
+		hosts[f.Host] = struct{}{}
+	}
+	st.Hosts = len(hosts)
+	return st
 }
 
 // Get returns one flow with its bodies.
@@ -201,35 +281,42 @@ func HostMatches(host, pattern string) bool {
 // Clear forgets every flow.
 func (s *Store) Clear() {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.order = nil
 	s.byID = map[string]*Flow{}
-	s.mu.Unlock()
-	s.publish(Event{Type: EventCleared})
+	s.bytes = 0
+	s.publishLocked(Event{Type: EventCleared})
 }
 
 // Subscribe delivers events until ctx ends. A slow subscriber loses events
-// rather than slowing the proxy; it should re-list with SinceSeq afterwards.
+// rather than slowing the proxy; it should re-list afterwards.
 func (s *Store) Subscribe(ctx context.Context) <-chan Event {
-	ch := make(chan Event, 256)
+	ch, _ := s.SubscribeCounted(ctx)
+	return ch
+}
+
+// SubscribeCounted is Subscribe with a function that reports how many events
+// this subscriber has lost so far, so a stream can tell its client to resync.
+func (s *Store) SubscribeCounted(ctx context.Context) (<-chan Event, func() uint64) {
+	sub := &subscriber{ch: make(chan Event, 256)}
 	s.mu.Lock()
-	s.subs[ch] = struct{}{}
+	s.subs[sub] = struct{}{}
 	s.mu.Unlock()
 	go func() {
 		<-ctx.Done()
 		s.mu.Lock()
-		delete(s.subs, ch)
+		delete(s.subs, sub)
 		s.mu.Unlock()
 	}()
-	return ch
+	return sub.ch, sub.dropped.Load
 }
 
-func (s *Store) publish(e Event) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for ch := range s.subs {
+func (s *Store) publishLocked(e Event) {
+	for sub := range s.subs {
 		select {
-		case ch <- e:
+		case sub.ch <- e:
 		default:
+			sub.dropped.Add(1)
 		}
 	}
 }
