@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -16,7 +17,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Data != "/home/tester/formnet" || cfg.Addr != DefaultAddr || cfg.ProxyAddr != DefaultProxyAddr {
+	if cfg.Data != filepath.Join("/home/tester", "formnet") || cfg.Addr != DefaultAddr || cfg.ProxyAddr != DefaultProxyAddr {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.BodyLimit != DefaultBodyLimit || cfg.FlowLimit != DefaultFlowLimit || cfg.MachineInterval != DefaultMachineInterval {
