@@ -76,7 +76,7 @@ function caCard(ca: CAInfo): HTMLElement {
     "div",
     {},
     h("h2", {}, "Root certificate ", h("span", { class: `badge ${ca.trusted ? "ok" : "warnb"}` }, ca.trusted ? "trusted" : "not trusted")),
-    h("p", {}, "formnet made this root on this computer. The private key stays in the data folder and is never served. HTTPS is opened only after you make the computer trust the root, and until then every HTTPS host is counted, not read."),
+    h("p", {}, "formNET made this root on this computer. The private key stays in the data folder and is never served. HTTPS is opened only after you make the computer trust the root, and until then every HTTPS host is counted, not read."),
     h("dl", { class: "kv" }, h("dt", {}, "Fingerprint"), h("dd", { class: "mono" }, ca.fingerprint), h("dt", {}, "Path"), h("dd", { class: "mono" }, ca.path), h("dt", {}, "Expires"), h("dd", {}, dateTime(ca.not_after))),
     h("div", { class: "row" }, h("a", { class: "btn", href: api.caURL(), download: "formnet-ca.pem" }, "Download ca.pem")),
     ca.trust_command ? h("div", {}, h("p", {}, ca.trust_hint || "Run this to trust the root. Nothing is installed until you run it yourself:"), h("div", { class: "row" }, h("code", { class: "cmd" }, ca.trust_command), copyButton("Copy", () => ca.trust_command))) : null,

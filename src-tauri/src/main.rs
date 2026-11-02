@@ -120,7 +120,7 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
         .unwrap_or_else(|_| data_dir(handle));
     let finished = handle.clone();
     let builder = WebviewWindowBuilder::new(handle, "main", WebviewUrl::External(url))
-        .title("formnet")
+        .title("formNET")
         .visible(reveal::BUILD_VISIBLE)
         .background_color(reveal::BACKGROUND)
         .inner_size(width, height)
@@ -184,14 +184,14 @@ fn fail(handle: &AppHandle, text: &str) {
     handle
         .dialog()
         .message(text)
-        .title("formnet")
+        .title("formNET")
         .show(move |_| quit.exit(1));
 }
 
 fn start(handle: AppHandle) {
     let dir = data_dir(&handle);
     if let Err(err) = std::fs::create_dir_all(&dir) {
-        fail(&handle, &format!("formnet could not create its data folder {}: {err}", dir.display()));
+        fail(&handle, &format!("formNET could not create its data folder {}: {err}", dir.display()));
         return;
     }
     let token = desktop_token();
@@ -209,7 +209,7 @@ fn start(handle: AppHandle) {
     let (mut rx, child) = match spawned {
         Ok(Ok(pair)) => pair,
         Ok(Err(err)) | Err(err) => {
-            fail(&handle, &format!("The formnet server could not start: {err}"));
+            fail(&handle, &format!("The formNET server could not start: {err}"));
             return;
         }
     };
@@ -229,7 +229,7 @@ fn start(handle: AppHandle) {
                             match open_main(&handle, found, &token) {
                                 Ok(()) => {}
                                 Err(err) => {
-                                    fail(&handle, &format!("formnet could not open its window: {err}"));
+                                    fail(&handle, &format!("formNET could not open its window: {err}"));
                                     return;
                                 }
                             }
@@ -249,9 +249,9 @@ fn start(handle: AppHandle) {
                     }
                     let detail = errors.last().cloned().unwrap_or_default();
                     let text = if port.is_none() {
-                        format!("The formnet server stopped before it was ready.\n\n{detail}")
+                        format!("The formNET server stopped before it was ready.\n\n{detail}")
                     } else {
-                        "The formnet server stopped unexpectedly. Open formnet again to continue; recordings are kept in memory only, so this one is gone.".to_string()
+                        "The formNET server stopped unexpectedly. Open formNET again to continue; recordings are kept in memory only, so this one is gone.".to_string()
                     };
                     fail(&handle, text.trim());
                     return;
@@ -318,7 +318,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("the formnet desktop app failed to build");
+        .expect("the formNET desktop app failed to build");
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {

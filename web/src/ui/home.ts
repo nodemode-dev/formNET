@@ -15,7 +15,7 @@ export interface HomeDeps {
 type Page = 'start';
 
 /** The Home screen, as the family's (formvis home.ts): a navigation column beside a Start page, over the views, under
- *  the title bar. formnet has views instead of documents, so flows stand in for them: Home shows at launch while the
+ *  the title bar. formNET has views instead of documents, so flows stand in for them: Home shows at launch while the
  *  recording is empty (Preferences > General), again after Clear Recording when that choice is on, and whenever the
  *  brand mark is clicked; the first flow to arrive, any view command, Back or Esc puts it away. Built once; every
  *  later change patches text, attributes and the two keyed lists. */
@@ -42,7 +42,7 @@ export class HomeScreen {
     const key = (k: string): string => `<kbd class="cv-key">${mod}</kbd><kbd class="cv-key">${k}</kbd>`;
     const chips = ['HTTP', 'HTTPS', 'HTTP/2', 'WebSocket', 'CONNECT', 'HAR'].map((f) => `<span class="cv-home-format">${f}</span>`).join('');
     this.root.innerHTML = `<nav class="cv-home-nav" aria-label="Home">
-      <div class="cv-home-brand">formnet <span>by nodemode.ai</span></div>
+      <div class="cv-home-brand">formNET <span>by nodemode.ai</span></div>
       ${navItem('start', 'home', 'Start')}
       <div class="cv-home-nav-sep"></div>
       <div class="cv-home-nav-title">Views</div>
@@ -56,7 +56,7 @@ export class HomeScreen {
         <div class="cv-home-hero">
           <span class="cv-home-hero-icon">${icon('network', 26)}</span>
           <div class="cv-home-hero-text"><div class="cv-home-hero-title">Start from a program</div>
-            <div class="cv-home-hero-sub">Set the proxy to <code class="cv-home-addr"></code> in a browser, a terminal or an app. HTTPS is opened once this computer trusts formnet's root; until then it is tunnelled and counted by host and bytes.</div>
+            <div class="cv-home-hero-sub">Set the proxy to <code class="cv-home-addr"></code> in a browser, a terminal or an app. HTTPS is opened once this computer trusts formNET's root; until then it is tunnelled and counted by host and bytes.</div>
             <div class="cv-home-formats">${chips}</div></div>
           <div class="cv-home-hero-actions">
             <button class="cv-home-action is-primary" type="button" data-cmd="view-flows">${icon('flows', 16)}<span class="cv-home-label">Open Flows</span>${key('1')}</button>

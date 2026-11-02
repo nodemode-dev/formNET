@@ -27,7 +27,7 @@ export class HttpsSection {
     this.box.addEventListener('change', () => {
       api.updateProxy({ intercept: this.box.checked }).then(() => reread(store)).catch((err: Error) => { toast(err.message, 'error'); reread(store); });
     });
-    this.el.append(open, this.note, bar, el('<p class="cv-note">Off, every HTTPS host is tunnelled and only counted by host and bytes. On, formnet signs a certificate per host with its root and shows the request and response; programs that use the system trust store need the root trusted first, and programs that pin their certificates belong in the passthrough list.</p>'));
+    this.el.append(open, this.note, bar, el('<p class="cv-note">Off, every HTTPS host is tunnelled and only counted by host and bytes. On, formNET signs a certificate per host with its root and shows the request and response; programs that use the system trust store need the root trusted first, and programs that pin their certificates belong in the passthrough list.</p>'));
     this.refresh(store.get().status);
   }
 

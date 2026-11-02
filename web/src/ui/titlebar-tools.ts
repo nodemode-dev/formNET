@@ -4,7 +4,7 @@ import { icon } from './icons';
 import { readChoice, setTheme } from './themes';
 
 /** The title bar's right-hand tools, as the family's (formvis titlebar-tools.ts, without the workspaces, the lock and
- *  the terminal buttons formnet has no use for): a theme toggle (Studio Dark and Light) and a search that finds and
+ *  the terminal buttons formNET has no use for): a theme toggle (Studio Dark and Light) and a search that finds and
  *  runs any enabled command by name, with its shortcut shown. */
 export class TitleTools {
   readonly root = el('<div class="cv-title-tools"></div>');

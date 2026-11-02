@@ -66,7 +66,7 @@ export class StatusBar {
     const st = s.status;
     const engine = !s.connected && !st ? t('Server offline') : st ? `${t('Server')} ${st.version}${isDesktop() ? ` · ${t('desktop')}` : ''}` : t('Server');
     setText(this.engine, engine);
-    setTitle(this.engine, s.connected ? t('Connected to the formnet server') : t('Reconnecting to the formnet server'));
+    setTitle(this.engine, s.connected ? t('Connected to the formNET server') : t('Reconnecting to the formNET server'));
     setClass(this.engine, 'is-off', !s.connected);
     const p = st?.proxy;
     setText(this.proxy, p ? `${t('Proxy')} ${p.addr}` : '');

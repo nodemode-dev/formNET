@@ -1,4 +1,4 @@
-/** formnet's app mark, the same artwork as the desktop icon, the splash and the favicon (assets/formnet_logo.svg: a
+/** formNET's app mark, the same artwork as the desktop icon, the splash and the favicon (assets/formnet_logo.svg: a
  *  node with three arcs of traffic leaving it), drawn inline on the family's rounded tile so it paints with the first
  *  frame. Every id is namespaced per copy, so two marks on screen never share a gradient. The splash page
  *  (src-tauri/splash/index.html) carries the same markup with the prefix "splash-". */
@@ -6,7 +6,7 @@ export const MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
 
 let copies = 0;
 
-export function brandMark(size: number, label = 'formnet'): string {
+export function brandMark(size: number, label = 'formNET'): string {
   const p = `cv-mark${++copies}-`;
   return MARK.replace(/\{p\}/g, p).replace('<svg ', `<svg class="cv-mark" width="${size}" height="${size}" role="img" aria-label="${label}" `);
 }

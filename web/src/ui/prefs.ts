@@ -1,7 +1,7 @@
 import { readChoice, setTheme } from './themes';
 import { isLang, type Lang } from './i18n/langs';
 
-/** Preferences that change how formnet works, kept on this device under one key. Every one acts on something real:
+/** Preferences that change how formNET works, kept on this device under one key. Every one acts on something real:
  *  the Home screen at launch and after Clear Recording, whether the Flows table follows new flows, how many rows it
  *  draws, the interface's text size and motion, and the theme pair Match System Appearance switches between. Server
  *  settings (the proxy, the body limit, the machine sampling) are the server's: Preferences > Capture reads and writes
@@ -43,7 +43,7 @@ const UI_FONT_SCALE: Record<UiFontSize, number> = { small: 0.92, default: 1, lar
 
 export const DEFAULT_PREFS: Prefs = { language: 'en', autoShowHome: true, homeOnClear: false, liveFollows: true, maxRows: 500, confirmClear: true, showTooltips: true, animations: true, noticeSeconds: 0, uiFontSize: 'default', themeAuto: false, themeLight: 'light', themeDark: 'studio', favouriteThemes: [], machineSort: 'connections', dialogValues: {} };
 
-/** Every key formnet writes to localStorage starts with this, so Reset All Preferences can find them. */
+/** Every key formNET writes to localStorage starts with this, so Reset All Preferences can find them. */
 export const PREFIX = 'formnet.';
 const KEY = `${PREFIX}prefs`;
 
@@ -64,7 +64,7 @@ function cleanDialogValues(v: unknown): Record<string, Record<string, DialogValu
   return out;
 }
 
-/** The system's language when it is one formnet has; English otherwise. */
+/** The system's language when it is one formNET has; English otherwise. */
 function systemLang(): Lang {
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of tags) {

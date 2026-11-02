@@ -6,7 +6,7 @@ usage() {
   cat << 'EOF'
 usage: ./build_app [--server-only] [--all] [--skip-web] [--debug] [--bundles LIST] [--clean] [--yes]
 
-Builds formnet start to finish: the desktop app for this computer, with the server inside it.
+Builds formNET start to finish: the desktop app for this computer, with the server inside it.
   1. checks Go 1.26+ and Node 22+
   2. installs the web client's packages when they are missing
   3. builds the web client into web/dist (embedded into the binary)
@@ -65,7 +65,7 @@ case "$version" in
   v[0-9]*.[0-9]*.[0-9]*) ;;
   *) die "web/package.json carries no x.y.z version" ;;
 esac
-say "formnet $version"
+say "formNET $version"
 
 if [ "$skip_web" -eq 0 ]; then
   if [ ! -d web/node_modules ]; then
