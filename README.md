@@ -20,6 +20,8 @@ It ships as one static Go binary with its web client embedded, and as a desktop 
 - **Machine**: the computer's connection table, refreshed every two seconds: each process, its remote endpoints, states and, where the platform reports it, bytes in and out. Flows through the proxy are labelled with the process that made them.
 - **Export**: HAR 1.2 of any filtered view, which browsers and other tools open.
 
+The window is the form family's: the menus (in the macOS menu bar in the desktop app, in the title bar elsewhere), the four views as tabs, a filter and the Live, Clear and Export HAR controls in the bar under them, a status bar with the server, the proxy, the HTTPS state and a readout you can cycle, a Home screen while the recording is empty, and Preferences (Edit menu, Cmd or Ctrl with comma) with the same themes and accent as the other form apps. Press F1 for the proxy setup.
+
 Scripts and agents can read the same API with `Authorization: Bearer <token>` (the token is in `~/formnet/token`): `/api/flows`, `/api/flows/{id}`, `/api/hosts`, `/api/machine`, `/api/export/har` and the event stream at `/api/stream`.
 
 ## Quick start

@@ -1,7 +1,8 @@
 """Window smoke for formnet: the built binary serves the client, the page's
-bearer token leaves the address bar and survives a reload, the views switch,
-the status strip shows the proxy, and a request sent through the proxy
-appears in the Flows table with its detail pane.
+bearer token leaves the address bar and survives a reload, the Home screen
+shows over an empty recording and goes away from its Flows item, the views
+switch, Setup shows the proxy, and a request sent through the proxy appears
+in the Flows table with its detail pane.
 
 Run from the repo root after `make build`:
     python -m pytest web/tests/window -q
@@ -98,7 +99,8 @@ def page(server):
         # The page is opened once with the token in the address; the client
         # keeps it (module and sessionStorage) and removes it from the address.
         pg.goto(f"{server['url']}/?token={server['token']}")
-        pg.wait_for_selector(".topbar")
+        pg.wait_for_selector(".cv-titlebar")
+        pg.wait_for_selector("body.app-ready")
         yield pg, errors
         browser.close()
 
@@ -162,25 +164,43 @@ def test_reload_keeps_the_session(page: tuple[Page, list[str]], server) -> None:
     pg, errors = page
     # The token survives a reload through sessionStorage; the address stays /.
     pg.reload()
-    pg.wait_for_selector(".topbar", timeout=10000)
+    pg.wait_for_selector(".cv-titlebar", timeout=10000)
+    pg.wait_for_selector("body.app-ready", timeout=10000)
     assert pg.url == server["url"] + "/"
     assert pg.locator(".session-lost").count() == 0
-    pg.wait_for_selector(".conn:has-text('connected')", timeout=10000)
+    # The status bar names the server once the stream is up.
+    pg.wait_for_selector(".cv-st-engine:has-text('Server')", timeout=10000)
     assert errors == [], f"console errors after reload: {errors}"
+
+
+def test_home_shows_over_an_empty_recording(page: tuple[Page, list[str]]) -> None:
+    pg, _ = page
+    # No flows yet: the Home screen covers the views; its Flows item puts it away.
+    home = pg.locator(".cv-home")
+    home.wait_for(state="visible", timeout=10000)
+    assert home.locator(".cv-home-brand").inner_text().startswith("formnet")
+    home.locator(".cv-home-nav [data-cmd='view-flows']").click()
+    home.wait_for(state="hidden", timeout=5000)
+    assert pg.locator(".view-flows").is_visible()
+    # The brand mark brings it back; Escape leaves it.
+    pg.locator(".cv-brand").click()
+    home.wait_for(state="visible", timeout=5000)
+    pg.keyboard.press("Escape")
+    home.wait_for(state="hidden", timeout=5000)
 
 
 def test_title_and_views(page: tuple[Page, list[str]]) -> None:
     pg, _ = page
     assert pg.title() == "formnet"
     for name in ("Hosts", "Machine", "Setup", "Flows"):
-        pg.get_by_role("tab", name=name, exact=True).click()
+        pg.locator(".cv-tab-strip").get_by_role("tab", name=name, exact=True).click()
         panel = pg.locator(f".view-{name.lower()}")
         assert panel.is_visible(), f"{name} view did not show"
 
 
 def test_setup_shows_proxy_address(page: tuple[Page, list[str]], server) -> None:
     pg, _ = page
-    pg.get_by_role("tab", name="Setup", exact=True).click()
+    pg.locator(".cv-tab-strip").get_by_role("tab", name="Setup", exact=True).click()
     addr = server["proxy"].removeprefix("http://")
     pg.wait_for_selector(f".view-setup code.big:has-text('{addr}')", timeout=10000)
     assert pg.locator(".view-setup").get_by_text("Root certificate").is_visible()
@@ -188,7 +208,7 @@ def test_setup_shows_proxy_address(page: tuple[Page, list[str]], server) -> None
 
 def test_proxied_request_appears_with_detail(page: tuple[Page, list[str]], server, target) -> None:
     pg, errors = page
-    pg.get_by_role("tab", name="Flows", exact=True).click()
+    pg.locator(".cv-tab-strip").get_by_role("tab", name="Flows", exact=True).click()
     status = send_through_proxy(server["proxy"], target + "/hello")
     assert status == 200
     row = pg.locator("table.flows tbody tr", has_text="127.0.0.1").first

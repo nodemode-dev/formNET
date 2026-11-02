@@ -1,4 +1,5 @@
 import type { Flow, FlowEvent, HostSummary, Snapshot, Status } from "./types.ts";
+import type { MachineSort } from "./ui/prefs";
 
 export type View = "flows" | "hosts" | "machine" | "setup";
 
@@ -14,6 +15,8 @@ export interface State {
   lastSeq: number;
   total: number; // the server's count at the last list response
   limit: number;
+  maxRows: number; // rows the Flows table draws, from Preferences
+  machineSort: MachineSort; // the Machine view's order, from Preferences
   selectedId: string | null;
   hosts: readonly HostSummary[];
   machine: Snapshot | null;
@@ -33,6 +36,8 @@ export const initialState: State = {
   lastSeq: 0,
   total: 0,
   limit: 5000,
+  maxRows: 500,
+  machineSort: "connections",
   selectedId: null,
   hosts: [],
   machine: null,

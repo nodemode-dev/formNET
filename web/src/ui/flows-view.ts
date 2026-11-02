@@ -4,8 +4,6 @@ import type { State, Store } from "../state.ts";
 import { visibleFlows } from "../state.ts";
 import type { Flow } from "../types.ts";
 
-const MAX_ROWS = 500;
-
 const columns = ["Time", "Process", "Method", "Host", "Path", "Status", "Type", "Sent", "Received", "Duration"];
 
 interface Drawn {
@@ -55,14 +53,14 @@ export function flowsView(store: Store): HTMLElement {
   const render = (s: State, prev: State) => {
     root.hidden = s.view !== "flows";
     if (root.hidden) return;
-    const listChanged = s.flows !== prev.flows || s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.live !== prev.live || s.view !== prev.view;
+    const listChanged = s.flows !== prev.flows || s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.live !== prev.live || s.view !== prev.view || s.maxRows !== prev.maxRows;
     if (listChanged) {
       let flows: Flow[];
       if (!s.live && frozen && s.filter === prev.filter && s.hostFilter === prev.hostFilter) {
         flows = frozen.map((f) => s.flows.get(f.id) ?? f);
       } else {
         const all = visibleFlows(s);
-        flows = all.slice(Math.max(0, all.length - MAX_ROWS));
+        flows = all.slice(Math.max(0, all.length - s.maxRows));
         note.textContent = all.length > flows.length ? `showing the newest ${flows.length} of ${all.length} matching flows` : "";
         frozen = s.live ? null : flows;
       }

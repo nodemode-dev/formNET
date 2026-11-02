@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod menu;
+mod reveal;
+mod text_edit;
+mod traffic_lights;
+mod zoom;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::webview::{DownloadEvent, NewWindowResponse};
-use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -116,12 +119,13 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
         .download_dir()
         .unwrap_or_else(|_| data_dir(handle));
     let finished = handle.clone();
-    WebviewWindowBuilder::new(handle, "main", WebviewUrl::External(url))
+    let builder = WebviewWindowBuilder::new(handle, "main", WebviewUrl::External(url))
         .title("formnet")
+        .visible(reveal::BUILD_VISIBLE)
+        .background_color(reveal::BACKGROUND)
         .inner_size(width, height)
         .min_inner_size(MIN_LOGICAL.0, MIN_LOGICAL.1)
         .center()
-        .background_color(tauri::webview::Color(17, 17, 19, 255))
         .disable_drag_drop_handler()
         .on_navigation(move |url| {
             if is_local(url, port) || url.scheme() == "about" {
@@ -157,8 +161,20 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
                 true
             }
             _ => true,
+        });
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+    let window = builder
+        .on_page_load(|window, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                traffic_lights::place(&window.as_ref().window());
+            }
         })
         .build()?;
+    reveal::conceal(&window);
+    traffic_lights::place(&window.as_ref().window());
     Ok(())
 }
 
@@ -211,7 +227,7 @@ fn start(handle: AppHandle) {
                         if let Ok(found) = rest.trim_end_matches('/').parse::<u16>() {
                             port = Some(found);
                             match open_main(&handle, found, &token) {
-                                Ok(()) => close_splash(&handle),
+                                Ok(()) => {}
                                 Err(err) => {
                                     fail(&handle, &format!("formnet could not open its window: {err}"));
                                     return;
@@ -267,6 +283,7 @@ fn stop_server(handle: &AppHandle) {
 }
 
 fn main() {
+    reveal::mark_launch();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| focus_main(app)))
         .plugin(tauri_plugin_shell::init())
@@ -277,14 +294,27 @@ fn main() {
             stopped: Arc::new(AtomicBool::new(false)),
             quitting: AtomicBool::new(false),
         })
-        .manage(menu::Zoom(Mutex::new(1.0)))
-        .on_menu_event(menu::handle)
-        .setup(|app| {
-            if cfg!(target_os = "macos") {
-                let bar = menu::build(app.handle())?;
-                app.set_menu(bar)?;
+        .manage(zoom::Zoom(Mutex::new(1.0)))
+        .on_window_event(|window, event| {
+            if window.label() == "main"
+                && matches!(
+                    event,
+                    WindowEvent::Resized(_) | WindowEvent::Focused(_) | WindowEvent::ThemeChanged(_) | WindowEvent::ScaleFactorChanged { .. }
+                )
+            {
+                traffic_lights::place(window);
             }
-            start(app.handle().clone());
+        })
+        .invoke_handler(tauri::generate_handler![
+            traffic_lights::set_window_title,
+            reveal::app_ready,
+            text_edit::text_edit,
+            zoom::ui_zoom
+        ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            reveal::round_splash(&handle);
+            start(handle);
             Ok(())
         })
         .build(tauri::generate_context!())

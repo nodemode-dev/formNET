@@ -2,22 +2,18 @@ import { h, clear } from "../dom.ts";
 import { ago, bytes, clock } from "../format.ts";
 import type { State, Store } from "../state.ts";
 import type { Connection, Process, Snapshot } from "../types.ts";
-
-type SortKey = "connections" | "bytes" | "name";
+import type { MachineSort as SortKey } from "./prefs";
 
 // machineView lists every process with connections; expanding one lists its connections.
 export function machineView(store: Store): HTMLElement {
-  let sort: SortKey = "connections";
+  let sort: SortKey = store.get().machineSort;
   const open = new Set<number>();
   const head = h("div", { class: "machine-head" });
   const list = h("div", { class: "procs" });
   const root = h("section", { class: "view view-machine", role: "tabpanel" }, head, list);
 
   const sortBtn = (key: SortKey, label: string) =>
-    h("button", { type: "button", class: "btn btn-small", "data-sort": key, onClick: () => {
-      sort = key;
-      paint(store.get().machine);
-    } }, label);
+    h("button", { type: "button", class: "btn btn-small", "data-sort": key, onClick: () => store.update({ machineSort: key }) }, label);
   const sorters = [sortBtn("connections", "By connections"), sortBtn("bytes", "By bytes"), sortBtn("name", "By name")];
   const info = h("span", { class: "dim small" });
   head.append(h("span", { class: "dim small" }, "Sort:"), ...sorters, info);
@@ -54,7 +50,8 @@ export function machineView(store: Store): HTMLElement {
   const render = (s: State, prev: State) => {
     root.hidden = s.view !== "machine";
     if (root.hidden) return;
-    if (s.machine !== prev.machine || s.view !== prev.view) paint(s.machine);
+    if (s.machineSort !== sort) sort = s.machineSort;
+    if (s.machine !== prev.machine || s.view !== prev.view || s.machineSort !== prev.machineSort) paint(s.machine);
   };
   store.subscribe(render);
   render(store.get(), { ...store.get(), machine: null });

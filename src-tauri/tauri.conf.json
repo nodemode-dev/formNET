@@ -4,7 +4,9 @@
   "mainBinaryName": "formnet-desktop",
   "version": "0.1.0",
   "identifier": "ai.nodemode.formnet",
-  "build": { "frontendDist": "splash" },
+  "build": {
+    "frontendDist": "splash"
+  },
   "app": {
     "windows": [
       {
@@ -12,14 +14,19 @@
         "title": "formnet",
         "url": "index.html",
         "width": 360,
-        "height": 180,
+        "height": 200,
         "resizable": false,
         "decorations": false,
         "center": true,
-        "backgroundColor": "#111113"
+        "transparent": true,
+        "shadow": false,
+        "visible": false
       }
     ],
-    "security": { "csp": null }
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
@@ -28,12 +35,28 @@
     "shortDescription": "What websites, apps and the machine actually send on the network",
     "longDescription": "formnet is the network tab for the whole computer: an intercepting HTTP(S) proxy with a local root certificate, a view of every connection the machine holds and the process behind it, and a client that shows who a program calls, how often, how much it sends and what is inside. The desktop app runs a private formnet server on this computer; nothing leaves it.",
     "copyright": "Copyright 2026 nodemode-ai.",
-    "externalBin": ["binaries/formnet-server"],
-    "resources": { "../LICENSE": "LICENSE" },
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-    "macOS": { "minimumSystemVersion": "12.0", "hardenedRuntime": true, "entitlements": "entitlements.plist" },
+    "externalBin": [
+      "binaries/formnet-server"
+    ],
+    "resources": {
+      "../LICENSE": "LICENSE"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist"
+    },
     "linux": {
-      "deb": { "section": "devel" }
+      "deb": {
+        "section": "devel"
+      }
     }
   }
 }

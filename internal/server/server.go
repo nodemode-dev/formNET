@@ -513,7 +513,9 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
+// The desktop window shows this page from 127.0.0.1, a remote origin to Tauri, whose commands travel over its own
+// ipc: scheme (http://ipc.localhost on Windows); a browser never reaches those, so allowing them costs nothing there.
+const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; frame-ancestors 'none'"
 
 // client serves the embedded web client. The page and its files are static
 // and need no session; the page reads ?token= itself and keeps it in memory.
