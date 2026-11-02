@@ -22,7 +22,7 @@ where node >nul 2>nul || (echo [build_app] Node 22 or newer is required: https:/
 if not defined GOTOOLCHAIN set "GOTOOLCHAIN=auto"
 for /f "delims=" %%v in ('node -p "require('./web/package.json').version"') do set "APPV=%%v"
 set "VERSION=v%APPV%"
-echo [build_app] formnet %VERSION%
+echo [build_app] formNET %VERSION%
 
 if not exist web\node_modules (
   echo [build_app] installing the web client's packages
@@ -59,7 +59,7 @@ exit /b 0
 
 :usage
 echo usage: build_app.bat [--server-only] [--debug] [--bundles msi,nsis] [--config JSON]
-echo Builds the formnet desktop app for Windows with the server inside it.
+echo Builds the formNET desktop app for Windows with the server inside it.
 exit /b 0
 :usage_fail
 echo usage: build_app.bat [--server-only] [--debug] [--bundles msi,nsis] [--config JSON]

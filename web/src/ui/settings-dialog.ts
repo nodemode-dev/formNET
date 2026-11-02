@@ -45,7 +45,7 @@ export class SettingsDialog extends Dialog {
   private prefs: Prefs = loadPrefs();
   private readonly homeRow = checkRow('Show Home screen at launch', (v) => this.change({ autoShowHome: v }));
   private readonly homeClearRow = checkRow('Show Home screen when the recording is cleared', (v) => this.change({ homeOnClear: v }));
-  private readonly liveRow = checkRow('New flows keep the table following when formnet starts', (v) => this.change({ liveFollows: v }));
+  private readonly liveRow = checkRow('New flows keep the table following when formNET starts', (v) => this.change({ liveFollows: v }));
   private readonly rowsRow = sliderRow('Rows drawn in the Flows table', 100, 5000, 100, (v) => this.change({ maxRows: v }), { def: 500 });
   private readonly confirmClearRow = checkRow('Ask before Clear Recording', (v) => this.change({ confirmClear: v }));
   private readonly intensityRow = sliderRow('Accent intensity (%)', 0, 150, 5, (v) => setIntensity(v / 100), { def: 100 });
@@ -110,7 +110,7 @@ export class SettingsDialog extends Dialog {
     accentRow.appendChild(this.accent);
     const reset = el<HTMLButtonElement>('<button class="cv-btn cv-btn-danger" type="button">Reset All Preferences...</button>');
     reset.addEventListener('click', () => {
-      void confirmAction('Reset all preferences?', 'Every preference of this window goes back to how formnet comes; the recording, the root certificate and the server\'s settings are kept. formnet reloads.', 'Reset', true).then((ok) => {
+      void confirmAction('Reset all preferences?', 'Every preference of this window goes back to how formNET comes; the recording, the root certificate and the server\'s settings are kept. formNET reloads.', 'Reset', true).then((ok) => {
         if (!ok) return;
         for (const k of Object.keys(localStorage)) if (k.startsWith(PREFIX) || k === STORAGE_KEY) localStorage.removeItem(k);
         location.reload();

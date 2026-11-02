@@ -1,4 +1,4 @@
-<h1 align="center">formnet</h1>
+<h1 align="center">formNET</h1>
 
 <p align="center"><b>What a website, an app or the whole machine actually does on the network: who it calls, how often, how much it sends, and what is inside.</b></p>
 
@@ -9,9 +9,9 @@
   <img src="https://img.shields.io/badge/license-Apache--2.0-555555" alt="license Apache-2.0" />
 </p>
 
-formnet is the network tab for the whole computer. A browser's developer tools show what one page requests; Fiddler and Charles show what one program sends through a proxy. formnet does both and adds the layer under them: every connection the machine holds, which process holds it and how many bytes have moved, so the question "what does this thing really do" has one answer in one window.
+formNET is the network tab for the whole computer. A browser's developer tools show what one page requests; Fiddler and Charles show what one program sends through a proxy. formNET does both and adds the layer under them: every connection the machine holds, which process holds it and how many bytes have moved, so the question "what does this thing really do" has one answer in one window.
 
-It ships as one static Go binary with its web client embedded, and as a desktop app (a window around that same binary). Nothing leaves the computer: both listeners bind the loopback interface only, the machine view does no DNS lookups unless you turn them on, and the recordings stay in memory until you export them. Because loopback is shared by every program on the computer, the web client and API answer only to the page formnet opened itself: `formnet serve` prints an address carrying this run's session token, and `formnet open` opens it.
+It ships as one static Go binary with its web client embedded, and as a desktop app (a window around that same binary). Nothing leaves the computer: both listeners bind the loopback interface only, the machine view does no DNS lookups unless you turn them on, and the recordings stay in memory until you export them. Because loopback is shared by every program on the computer, the web client and API answer only to the page formNET opened itself: `formnet serve` prints an address carrying this run's session token, and `formnet open` opens it.
 
 ## What it shows
 
@@ -40,13 +40,13 @@ curl -x http://127.0.0.1:8761 --cacert ~/formnet/ca.pem https://example.com/    
 HTTPS_PROXY=http://127.0.0.1:8761 HTTP_PROXY=http://127.0.0.1:8761 some-program
 ```
 
-Until the computer trusts formnet's root, HTTPS is tunnelled and counted by host and bytes but not opened (curl with `--cacert` is the exception: switch "Open HTTPS" on in Setup, or set `FORMNET_INTERCEPT=on`). To open HTTPS from programs that use the system trust store (browsers, most apps), trust the root once, for your user only and for TLS only:
+Until the computer trusts formNET's root, HTTPS is tunnelled and counted by host and bytes but not opened (curl with `--cacert` is the exception: switch "Open HTTPS" on in Setup, or set `FORMNET_INTERCEPT=on`). To open HTTPS from programs that use the system trust store (browsers, most apps), trust the root once, for your user only and for TLS only:
 
 ```shell
 ./bin/formnet ca trust        # prints the command for this OS; nothing is installed without you running it
 ```
 
-The root is made on this computer on first run; its private key never leaves `~/formnet` and is never served. The printed command adds trust for your account (macOS asks in a dialog; no sudo), and `formnet ca` also prints the command that removes it. Programs that pin their certificates will refuse the opened connection; add their hosts to the passthrough list (in the client, or `FORMNET_PASSTHROUGH=*.example.com`) and formnet will tunnel them and count bytes only.
+The root is made on this computer on first run; its private key never leaves `~/formnet` and is never served. The printed command adds trust for your account (macOS asks in a dialog; no sudo), and `formnet ca` also prints the command that removes it. Programs that pin their certificates will refuse the opened connection; add their hosts to the passthrough list (in the client, or `FORMNET_PASSTHROUGH=*.example.com`) and formNET will tunnel them and count bytes only.
 
 The machine view needs no setup and no privileges; it reads the same table `lsof`, `/proc` or `netstat` would show you.
 
@@ -70,7 +70,7 @@ The machine view needs no setup and no privileges; it reads the same table `lsof
 ```shell
 make check    # gofmt, go vet, TypeScript
 make test     # go test ./...
-cd web && npm run dev   # client on :5176 proxied to a running formnet
+cd web && npm run dev   # client on :5176 proxied to a running formNET
 ```
 
 The desktop app is built by `./build_app` (macOS, Linux) or `build_app.bat` (Windows) and, for releases, by formcompiler.

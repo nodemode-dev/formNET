@@ -30,7 +30,7 @@ const SHELL = `<div class="cv-app">
 <header class="cv-titlebar">
 <nav class="cv-menubar" aria-label="Main menu"></nav>
 <div class="cv-tb-doc"></div>
-<div class="cv-tb-app">formnet 2026</div>
+<div class="cv-tb-app">formNET 2026</div>
 <div class="cv-zoom"><button class="cv-tt-btn" type="button" data-cmd="settings">${icon('settings', 16)}</button></div>
 </header>
 <div class="cv-main">
@@ -42,7 +42,7 @@ const SHELL = `<div class="cv-app">
 </div>`;
 
 /** Builds the window once around the store: the family's shell (title bar, menus, view tabs, options bar, status bar,
- *  Home) with formnet's views on the stage, then connects the live data and reveals the page. */
+ *  Home) with formNET's views on the stage, then connects the live data and reveals the page. */
 export function startApp(store: Store, onLost: () => void): void {
   const appHost = document.getElementById('app');
   if (!appHost) return;
@@ -130,8 +130,8 @@ export function startApp(store: Store, onLost: () => void): void {
   applyUiPrefs(prefs);
   applyUiZoom();
   window.addEventListener(UI_SCALE_EVENT, applyUiZoom);
-  document.title = 'formnet';
-  if ('__TAURI_INTERNALS__' in window) void import('@tauri-apps/api/core').then((m) => m.invoke('set_window_title', { title: 'formnet' })).catch(() => undefined);
+  document.title = 'formNET';
+  if ('__TAURI_INTERNALS__' in window) void import('@tauri-apps/api/core').then((m) => m.invoke('set_window_title', { title: 'formNET' })).catch(() => undefined);
   connectLive(store, onLost);
   startPageTranslator();
   const fonts = 'fonts' in document ? document.fonts.ready.then(() => undefined) : Promise.resolve();

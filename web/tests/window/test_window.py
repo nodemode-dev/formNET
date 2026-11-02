@@ -76,7 +76,7 @@ def server():
             except RuntimeError as err:
                 if proc.poll() is not None:
                     _, stderr = proc.communicate(timeout=2)
-                    raise RuntimeError(f"formnet exited with {proc.returncode}: {stderr}") from err
+                    raise RuntimeError(f"formNET exited with {proc.returncode}: {stderr}") from err
                 raise
             yield {"url": f"http://127.0.0.1:{port}", "proxy": f"http://127.0.0.1:{proxy_port}", "token": token}
         finally:
@@ -115,7 +115,7 @@ def send_through_proxy(proxy: str, url: str) -> int:
 def target():
     """A throwaway local HTTP server to send through the proxy.
 
-    formnet refuses requests to its own addresses, so the smoke needs a
+    formNET refuses requests to its own addresses, so the smoke needs a
     different loopback listener as the destination.
     """
     import http.server
@@ -178,7 +178,7 @@ def test_home_shows_over_an_empty_recording(page: tuple[Page, list[str]]) -> Non
     # No flows yet: the Home screen covers the views; its Flows item puts it away.
     home = pg.locator(".cv-home")
     home.wait_for(state="visible", timeout=10000)
-    assert home.locator(".cv-home-brand").inner_text().startswith("formnet")
+    assert home.locator(".cv-home-brand").inner_text().startswith("formNET")
     home.locator(".cv-home-nav [data-cmd='view-flows']").click()
     home.wait_for(state="hidden", timeout=5000)
     assert pg.locator(".view-flows").is_visible()
@@ -191,7 +191,7 @@ def test_home_shows_over_an_empty_recording(page: tuple[Page, list[str]]) -> Non
 
 def test_title_and_views(page: tuple[Page, list[str]]) -> None:
     pg, _ = page
-    assert pg.title() == "formnet"
+    assert pg.title() == "formNET"
     for name in ("Hosts", "Machine", "Setup", "Flows"):
         pg.locator(".cv-tab-strip").get_by_role("tab", name=name, exact=True).click()
         panel = pg.locator(f".view-{name.lower()}")

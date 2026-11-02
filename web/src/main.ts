@@ -12,7 +12,7 @@ function lostSession(): void {
   root?.replaceChildren(
     h('div', { class: 'session-lost', role: 'alert' },
       h('h1', {}, 'No session'),
-      h('p', {}, 'This formnet page has no session. Open formnet from the address printed by ', h('code', {}, 'formnet serve'), ', or run ', h('code', {}, 'formnet open'), '.')),
+      h('p', {}, 'This formNET page has no session. Open formNET from the address printed by ', h('code', {}, 'formnet serve'), ', or run ', h('code', {}, 'formnet open'), '.')),
   );
   revealApp();
 }

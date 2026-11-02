@@ -7,7 +7,7 @@ import { LANG_NAMES, LANG_PARENT, RTL_LANGS, isLang as isLangCode, type Lang } f
 export type { Lang } from './i18n/langs';
 
 type Table = Record<string, string>;
-/** The tables are loaded lazily, one module per language, as formvis ships them. formnet ships none yet: every
+/** The tables are loaded lazily, one module per language, as formvis ships them. formNET ships none yet: every
  *  loader is left out, the picker lists English alone, and the plumbing (t, onLanguage, the page translator) is in
  *  place for the day the tables are ported. Add a language here and in LANG_NAMES at the same time. */
 const LOADERS: Partial<Record<Exclude<Lang, 'en'>, () => Promise<Table>>> = {};

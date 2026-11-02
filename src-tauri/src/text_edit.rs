@@ -1,4 +1,4 @@
-//! macOS: the menu bar's Edit items are formnet commands with Cmd+Z, Cmd+X, Cmd+C, Cmd+V and Cmd+A, so the menu took those
+//! macOS: the menu bar's Edit items are formNET commands with Cmd+Z, Cmd+X, Cmd+C, Cmd+V and Cmd+A, so the menu took those
 //! keys before a focused text field could (formvis 1.96.2: Cmd+V did nothing in a key field; the context menu's Paste
 //! worked). While a field has focus the page calls this instead of the command, and the standard edit action goes to the
 //! first responder, the web view, which edits the field exactly as the context menu does, with no clipboard prompt.
