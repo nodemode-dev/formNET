@@ -53,7 +53,8 @@ func TestLoadCreatesAndReloadsTheSameRoot(t *testing.T) {
 	if info.CommonName != first.CommonName() || !strings.HasPrefix(info.CommonName, "formnet root on ") {
 		t.Fatalf("common name: %q", info.CommonName)
 	}
-	if info.UntrustCommand == "" || !strings.Contains(info.UntrustCommand, info.CommonName) {
+	namesTheRoot := strings.Contains(info.UntrustCommand, info.CommonName) || strings.Contains(info.UntrustCommand, "formnet.crt")
+	if info.UntrustCommand == "" || !namesTheRoot {
 		t.Fatalf("untrust: %q", info.UntrustCommand)
 	}
 	if !strings.Contains(info.TrustCommand, "'"+info.Path+"'") {

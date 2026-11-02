@@ -99,7 +99,7 @@ func TestReadProcJoinsOwners(t *testing.T) {
 	if len(conns) != 5 {
 		t.Fatalf("connections: %d", len(conns))
 	}
-	if info[4242].name != "formnet" || info[4242].path != "/usr/local/bin/formnet" {
+	if info[4242].name != "formnet" || info[4242].path != filepath.FromSlash("/usr/local/bin/formnet") {
 		t.Fatalf("info: %+v", info)
 	}
 	if info[5151].name != "averyveryverylongprogramname" {
