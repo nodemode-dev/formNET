@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "formNET",
+  "productName": "FormNET",
   "mainBinaryName": "formnet-desktop",
   "version": "0.1.0",
   "identifier": "ai.nodemode.formnet",
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "splash",
-        "title": "formNET",
+        "title": "FormNET",
         "url": "index.html",
         "width": 360,
         "height": 200,

@@ -120,7 +120,7 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
         .unwrap_or_else(|_| data_dir(handle));
     let finished = handle.clone();
     let builder = WebviewWindowBuilder::new(handle, "main", WebviewUrl::External(url))
-        .title("formNET")
+        .title("FormNET")
         .visible(reveal::BUILD_VISIBLE)
         .background_color(reveal::BACKGROUND)
         .inner_size(width, height)
@@ -184,7 +184,7 @@ fn fail(handle: &AppHandle, text: &str) {
     handle
         .dialog()
         .message(text)
-        .title("formNET")
+        .title("FormNET")
         .show(move |_| quit.exit(1));
 }
 
