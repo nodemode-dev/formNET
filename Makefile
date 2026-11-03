@@ -9,7 +9,7 @@ build: web server
 
 web:
 	test -d web/node_modules || ./web/oc_install
-	rm -rf web/dist/assets web/dist/index.html web/dist/favicon.svg
+	rm -rf web/dist/assets web/dist/index.html web/dist/favicon.png
 	cd web && npm run build
 
 server:
@@ -35,4 +35,4 @@ test:
 	go test -count=1 ./...
 
 clean:
-	rm -rf bin release web/dist/assets web/dist/index.html web/dist/favicon.svg
+	rm -rf bin release web/dist/assets web/dist/index.html web/dist/favicon.png
