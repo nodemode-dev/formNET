@@ -52,7 +52,7 @@ func newTest(t *testing.T) (*httptest.Server, *flow.Store, *fakeProxy) {
 	dist := fstest.MapFS{
 		"index.html":    {Data: []byte("<!doctype html><title>formnet</title>")},
 		"assets/app.js": {Data: []byte("console.log(1)")},
-		"favicon.svg":   {Data: []byte("<svg/>")},
+		"favicon.png":   {Data: []byte("png")},
 	}
 	h := Handler(Deps{Addr: "127.0.0.1:8760", Token: testToken, Store: store, Proxy: p, CA: fakeCA{}, Machine: &fakeMachine{ch: make(chan machine.Snapshot, 1)}, Dist: dist})
 	srv := httptest.NewServer(h)

@@ -191,7 +191,7 @@ def test_home_shows_over_an_empty_recording(page: tuple[Page, list[str]]) -> Non
 
 def test_title_and_views(page: tuple[Page, list[str]]) -> None:
     pg, _ = page
-    assert pg.title() == "formNET"
+    assert pg.title() == "FormNET"
     for name in ("Hosts", "Machine", "Setup", "Flows"):
         pg.locator(".cv-tab-strip").get_by_role("tab", name=name, exact=True).click()
         panel = pg.locator(f".view-{name.lower()}")
