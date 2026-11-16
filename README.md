@@ -166,8 +166,8 @@ Agents: [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md)
 
 | Maintainer | Role |
 |---|---|
-| [@nodemode-ai](https://github.com/nodemode-ai) | Owner |
-| [@gbarnai](https://github.com/gbarnai) | Co-owner |
+| [@gbarnai](https://github.com/gbarnai) | Owner |
+| [@nodemode-ai](https://github.com/nodemode-ai) | Co-Owner |
 
 Code owners are set in [`.github/CODEOWNERS`](.github/CODEOWNERS).
 
