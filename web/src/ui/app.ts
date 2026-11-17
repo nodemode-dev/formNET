@@ -130,8 +130,8 @@ export function startApp(store: Store, onLost: () => void): void {
   applyUiPrefs(prefs);
   applyUiZoom();
   window.addEventListener(UI_SCALE_EVENT, applyUiZoom);
-  document.title = 'formNET';
-  if ('__TAURI_INTERNALS__' in window) void import('@tauri-apps/api/core').then((m) => m.invoke('set_window_title', { title: 'formNET' })).catch(() => undefined);
+  document.title = 'FormNET';
+  if ('__TAURI_INTERNALS__' in window) void import('@tauri-apps/api/core').then((m) => m.invoke('set_window_title', { title: 'FormNET' })).catch(() => undefined);
   connectLive(store, onLost);
   startPageTranslator();
   const fonts = 'fonts' in document ? document.fonts.ready.then(() => undefined) : Promise.resolve();
