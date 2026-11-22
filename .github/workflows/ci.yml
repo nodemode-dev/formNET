@@ -30,7 +30,7 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web
       - name: audit web dependencies
-        run: npm audit --audit-level=low
+        run: npm audit
         working-directory: web
       - name: no em dash in markdown
         run: |
