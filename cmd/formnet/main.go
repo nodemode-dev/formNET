@@ -57,6 +57,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return printURL(stdout, stderr)
 	case "open":
 		return openBrowser(stdout, stderr)
+	case "mcp":
+		return mcpCommand(args[1:], os.Stdin, stdout, stderr)
+	case "agents":
+		return agentsCommand(args[1:], stdout, stderr)
 	case "help", "--help", "-h":
 		usage(stdout)
 		return 0
@@ -78,6 +82,9 @@ func usage(w io.Writer) {
   ca export PATH   write the root certificate (PEM) to PATH
   ca trust         print the command that makes this computer trust the root
   snapshot         print the machine's connection table once, as JSON
+  mcp              serve MCP on stdio for agents; reads the running formnet, starts nothing
+  agents sync      write agents/, the skill pack's tool table and .agents/skills (in the repository)
+  agents check     fail when those files are stale or a skill breaks the format contract
   version          print the version
   help             this text
 
