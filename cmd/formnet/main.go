@@ -31,6 +31,7 @@ import (
 	"github.com/nodemode-dev/formnet/internal/proxy"
 	"github.com/nodemode-dev/formnet/internal/server"
 	"github.com/nodemode-dev/formnet/internal/settings"
+	"github.com/nodemode-dev/formnet/internal/terminal"
 	"github.com/nodemode-dev/formnet/internal/userfile"
 )
 
@@ -194,8 +195,10 @@ func serve(stdout, stderr io.Writer) int {
 	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
 	remember := func(u server.ProxySettings) error { return saved.Update(u.Intercept, u.Passthrough) }
+	terminals := terminal.New(terminal.Options{APIAddr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Log: log})
+	defer terminals.Close()
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, Terminals: terminals}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
@@ -234,6 +237,7 @@ func serve(stdout, stderr io.Writer) int {
 			code = 1
 		}
 	}
+	terminals.Close()
 	removeEndpoints(cfg.Data)
 	stop()
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
