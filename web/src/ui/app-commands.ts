@@ -66,6 +66,10 @@ export function registerCommands(d: CommandDeps): Commands {
   const clear = (): void => { api.clearFlows().catch((err: Error) => st.update({ notice: err.message })); };
   c.add(
     { id: 'export-har', label: 'Export HAR...', keys: ['Mod+S'], run: () => download(api.harURL(exportFilter(st.get())), 'formnet.har') },
+    { id: 'export-har-secrets', label: 'Export HAR with secrets...', run: () => {
+      void confirmAction('Export HAR with secrets?', 'This file will hold the passwords, tokens and cookies the recorded requests carried (the Authorization, Proxy-Authorization, Cookie and Set-Cookie headers). Anyone who gets the file can sign in as you with them. Keep it private and delete it when you are done. Export HAR leaves them out.', 'Export with secrets', true)
+        .then((ok) => { if (ok) download(api.harURL(exportFilter(st.get()), true), 'formnet-with-secrets.har'); });
+    } },
     { id: 'download-ca', label: 'Download Root Certificate...', run: () => download(api.caURL(), 'formnet-ca.pem') },
     { id: 'clear-recording', label: 'Clear Recording', keys: ['Mod+K'], enabled: () => st.get().flows.size > 0, run: () => {
       if (!loadPrefs().confirmClear) { clear(); return; }

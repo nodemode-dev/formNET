@@ -21,7 +21,7 @@ export interface TLSInfo {
   intercepted: boolean;
 }
 
-export type FlowKind = "http" | "tunnel" | "websocket";
+export type FlowKind = "http" | "tunnel" | "websocket" | "refused";
 
 export interface Flow {
   id: string;
@@ -58,6 +58,8 @@ export interface Body {
   base64?: string;
   bytes: number;
   truncated: boolean;
+  decoded?: boolean;
+  encoding?: string;
 }
 
 export interface FlowDetail extends Flow {
@@ -112,10 +114,13 @@ export interface Snapshot {
   connections: Connection[] | null;
 }
 
+export type InterceptMode = "auto" | "on" | "off";
+
 export interface ProxyStatus {
   addr: string;
   running: boolean;
   intercept: boolean;
+  intercept_mode?: InterceptMode;
   passthrough: string[] | null;
   error?: string;
 }
