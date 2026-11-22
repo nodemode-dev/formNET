@@ -2,6 +2,16 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.6.0 · 2026-11-22
+
+Agents can use FormNET, and FormNET has the family's terminal panel.
+
+- `formnet mcp`: an MCP server for agents such as Claude Code. It reads the running FormNET and starts nothing. Ten tools: six read flows, hosts, the machine table, the proxy and the root certificate; one exports a HAR into FormNET's own exports folder; three change things (clear the recording, the HTTPS choice, the passthrough list) and are marked so an agent asks you first. Passwords, tokens and cookies read `[redacted]` in everything an agent sees.
+- A skill pack, `formnet-inspector`, teaches agents to point programs at the proxy, trust the root, read flows and export HAR.
+- The terminal panel (View > Terminal, Cmd+J or Ctrl+J), shared with FormVis and FormDeck. It finds Claude Code, Codex, Cursor and Antigravity if you have them.
+- Preferences > Agents and Scripts can send the traffic of new terminal tabs to Flows, so an agent you start there shows every request it makes.
+- For the people who build FormNET: three Go modules (coder/websocket, creack/pty, golang.org/x/sys) and two web packages (xterm), all permissive, listed in `NOTICES.md`. `make check` also runs `formnet agents check`.
+
 ## 0.5.0 · 2026-11-22
 
 FormNET looks and starts like the rest of the family, in its own colour, and speaks every language the family speaks.
