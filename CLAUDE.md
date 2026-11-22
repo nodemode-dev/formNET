@@ -1,6 +1,6 @@
-# formNET
+# FormNET
 
-The app is formNET (repository `nodemode-dev/formNET`, window title, splash, releases). The CLI binary, module path, bundle identifier `ai.nodemode.formnet`, data folder `~/formnet`, `FORMNET_*` variables, the `formnet.` storage prefix and the API's `product` value stay lower case: they are names programs read, not the name people see.
+The app is FormNET wherever a person reads its name: the window title, the splash, menus, dialogs, documents and releases. The repository stays `nodemode-dev/formNET`. The CLI binary, module path, bundle identifier `ai.nodemode.formnet`, data folder `~/formnet`, `FORMNET_*` variables, the `formnet.` storage prefix and the API's `product` value stay lower case: they are names programs read, not the name people see.
 
 What a program actually does on the network, not what it promises: an intercepting HTTP(S) proxy with a local root certificate, a machine-wide view of every connection and the process behind it, and a web client that reads like a browser's network tab for the whole computer. One Go binary with the client embedded; a Tauri 2 window around it for the desktop app. Part of the form family, built and released by formcompiler.
 
@@ -23,9 +23,9 @@ What a program actually does on the network, not what it promises: an intercepti
 
 ## Rules
 
-- Never listen on a non-loopback address. The proxy and the API carry the bodies of everything formNET sees.
+- Never listen on a non-loopback address. The proxy and the API carry the bodies of everything FormNET sees.
 - Loopback is not a trust boundary: every program and user on the computer shares it. The API answers only with the run's session token (`FORMNET_TOKEN`, or the one written to `<data>/token` with mode 0600). Never add a route that serves recordings without it.
-- The proxy never connects to formNET's own addresses, and never to a loopback address reached through a host name (DNS rebinding into local services). Private ranges stay reachable; intranet hosts are legitimate.
+- The proxy never connects to FormNET's own addresses, and never to a loopback address reached through a host name (DNS rebinding into local services). Private ranges stay reachable; intranet hosts are legitimate.
 - HTTPS is opened only when the root is trusted (or `FORMNET_INTERCEPT=on`); otherwise it is tunnelled and counted, and the UI says so. Keep the wording and the behaviour in step.
 - The root certificate's private key never leaves the data folder (mode 0600) and is never served by any route. Only the certificate is downloadable.
 - Flows are values. Build a new `Flow` for every change and hand it to the Store; never edit a stored one in place.
