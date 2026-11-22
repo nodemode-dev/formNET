@@ -2,6 +2,21 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.5.0 · 2026-11-22
+
+FormNET looks and starts like the rest of the family, in its own colour, and speaks every language the family speaks.
+
+- FormNET's own accent, a soft violet, in place of the family's orange. If you never chose an accent you get the new one from the first frame; an accent you chose is kept. The logo and the splash are unchanged.
+- The 29 family themes, AMOLED Black included.
+- The desktop app opens with no white or unpainted frame on macOS and Linux: the window stays unseen until its page has painted, then appears as the splash goes. On Windows the window may show briefly in the theme's colour behind the splash, never white. The window's address no longer carries the session token.
+- Home has four pages, Start, Hosts, Processes and Setup, with live counts beside each, and stays open while traffic arrives if you opened it.
+- Setup shows where things stand and what to copy; every setting is in Preferences, and each block on Setup has a button that opens the right panel. Preferences > Capture now holds the root certificate's state, its trust command and its download.
+- Preferences has the family's floating tab rail and the line from the chosen tab to the dialog. The session token in Agents and Scripts is hidden until you choose Show.
+- Buttons, tabs and segmented controls are the family's, in every view.
+- Every language the family ships: 30 in all, switched in Preferences without a reload. Arabic reads right to left, while paths, addresses and sizes still read left to right. Dates, times and numbers follow the language.
+- Flows past 500 rows no longer moves under you: rows you are reading stay put, and a note says how many newer flows are waiting.
+- The name you read is FormNET everywhere: menus, About, dialogs, the trust help and the installer.
+
 ## 0.4.0 · 2026-11-22
 
 Nothing in the window flashes, jumps or loses what you typed, and the window has the choices 0.3.0's server made possible.
