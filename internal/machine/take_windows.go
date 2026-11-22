@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -31,7 +32,7 @@ func take(ctx context.Context) (Snapshot, error) {
 	defer cancel()
 	var text string
 	for _, proto := range []string{"tcp", "udp"} {
-		out, err := exec.CommandContext(ctx, netstatPath, "-ano", "-p", proto).Output()
+		out, err := hidden(exec.CommandContext(ctx, netstatPath, "-ano", "-p", proto)).Output()
 		if err != nil {
 			return Snapshot{Taken: time.Now(), Source: "netstat", Supported: true, Error: err.Error()}, fmt.Errorf("netstat: %w", err)
 		}
@@ -39,10 +40,17 @@ func take(ctx context.Context) (Snapshot, error) {
 	}
 	conns := parseNetstat(text)
 	info := map[int]procInfo{}
-	if raw, err := exec.CommandContext(ctx, tasklistPath, "/fo", "csv", "/nh").Output(); err == nil {
+	if raw, err := hidden(exec.CommandContext(ctx, tasklistPath, "/fo", "csv", "/nh")).Output(); err == nil {
 		for pid, name := range parseTasklist(string(raw)) {
 			info[pid] = procInfo{name: name}
 		}
 	}
 	return assemble("netstat", conns, info), nil
+}
+
+const createNoWindow = 0x08000000
+
+func hidden(cmd *exec.Cmd) *exec.Cmd {
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+	return cmd
 }

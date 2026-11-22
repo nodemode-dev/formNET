@@ -6,8 +6,9 @@ import (
 	"strings"
 )
 
-// parseNetstat reads Windows `netstat -ano -p tcp` and `-p udp` output.
-// TCP rows have proto, local, foreign, state, pid; UDP rows have no state.
+// parseNetstat reads Windows `netstat -ano -p tcp` and `-p udp` output by
+// column position: proto, local, foreign, then the state (TCP only, in the
+// system's language) and the pid last.
 func parseNetstat(text string) []Connection {
 	var out []Connection
 	for _, line := range strings.Split(text, "\n") {
@@ -19,15 +20,13 @@ func parseNetstat(text string) []Connection {
 		if kind != "TCP" && kind != "UDP" {
 			continue
 		}
-		var state, pidText string
-		if kind == "TCP" && len(fields) >= 5 {
-			state, pidText = fields[3], fields[4]
-		} else {
-			pidText = fields[3]
-		}
-		pid, err := strconv.Atoi(pidText)
+		pid, err := strconv.Atoi(fields[len(fields)-1])
 		if err != nil {
 			continue
+		}
+		state := ""
+		if kind == "TCP" {
+			state = netstatTCPState(strings.Join(fields[3:len(fields)-1], " "), fields[2])
 		}
 		ipv6 := strings.HasPrefix(fields[1], "[")
 		proto := protoFor(kind, ipv6)
@@ -45,6 +44,23 @@ func parseNetstat(text string) []Connection {
 		out = append(out, Connection{Proto: proto, PID: pid, Local: local, Remote: remote, State: state})
 	}
 	return out
+}
+
+var netstatEnglishStates = map[string]string{
+	"LISTENING": "LISTEN", "ESTABLISHED": "ESTABLISHED", "TIME_WAIT": "TIME_WAIT", "CLOSE_WAIT": "CLOSE_WAIT",
+	"SYN_SENT": "SYN_SENT", "SYN_RECEIVED": "SYN_RECEIVED", "FIN_WAIT_1": "FIN_WAIT_1", "FIN_WAIT_2": "FIN_WAIT_2",
+	"LAST_ACK": "LAST_ACK", "CLOSING": "CLOSING", "CLOSED": "CLOSED", "BOUND": "BOUND", "DELETE_TCB": "DELETE_TCB",
+}
+
+func netstatTCPState(word, foreign string) string {
+	if s, ok := netstatEnglishStates[strings.ToUpper(word)]; ok {
+		return s
+	}
+	switch foreign {
+	case "0.0.0.0:0", "[::]:0", "*:*":
+		return "LISTEN"
+	}
+	return "ESTABLISHED"
 }
 
 func netstatAddr(s string, ipv6 bool) (string, bool) {
