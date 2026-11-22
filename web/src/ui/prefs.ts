@@ -152,6 +152,19 @@ export function setUiScale(v: string): void {
   window.dispatchEvent(new Event(UI_SCALE_EVENT));
 }
 
+/** Preferences > Agents and Scripts: new terminal tabs get this run's proxy and root certificate in their environment,
+ *  so the programs started there show in Flows. Off unless chosen; kept under its own key so Preferences' record,
+ *  read when the dialog opens, never writes an older value over it. */
+export const TERMINAL_CAPTURE_KEY = `${PREFIX}terminalCapture`;
+let captureHeld = false;
+export function terminalCapture(): boolean {
+  try { return localStorage.getItem(TERMINAL_CAPTURE_KEY) === '1'; } catch { return captureHeld; }
+}
+export function setTerminalCapture(on: boolean): void {
+  captureHeld = on;
+  try { localStorage.setItem(TERMINAL_CAPTURE_KEY, on ? '1' : '0'); } catch { /* kept for this session only */ }
+}
+
 let systemScheme: MediaQueryList | null = null;
 let systemSchemeOn: (() => void) | null = null;
 /** Interface > Match System Appearance: the light or dark theme of the pair is set now and again when the system's appearance changes. */
