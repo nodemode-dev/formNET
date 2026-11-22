@@ -1,9 +1,11 @@
 import { h } from "../dom.ts";
-import { keepOrder, patchList, setClass, setHidden, setText, setTitle } from "./dom";
+import { keepOrder, patchList, setClass, setHidden, setStyleVar, setText, setTitle } from "./dom";
 import { ago, bytes, clock } from "../format.ts";
 import type { State, Store } from "../state.ts";
 import type { Connection, Process, Snapshot } from "../types.ts";
 import type { MachineSort as SortKey } from "./prefs";
+import { onLanguage, t, tn } from "./i18n";
+import { icon } from "./icons";
 
 // machineView lists every process with connections; expanding one lists its connections.
 export function machineView(store: Store): HTMLElement {
@@ -15,28 +17,29 @@ export function machineView(store: Store): HTMLElement {
 
   let resort = true;
   let order: string[] = [];
+  const seen = new Map<number, Process>();
   const sortBtn = (key: SortKey, label: string) =>
-    h("button", { type: "button", class: "btn btn-small", "data-sort": key, title: "Sort now; rows keep their places between samples until the next sort", onClick: () => {
+    h("button", { type: "button", "data-sort": key, title: t("Sort now; rows keep their places between samples until the next sort"), onClick: () => {
       resort = true;
       if (store.get().machineSort === key) paint(last);
       else store.update({ machineSort: key });
-    } }, label);
+    } }, t(label));
   const sorters = [sortBtn("connections", "By connections"), sortBtn("bytes", "By bytes"), sortBtn("name", "By name")];
-  const info = h("span", { class: "dim small" });
-  head.append(h("span", { class: "dim small" }, "Sort:"), ...sorters, info);
+  const info = h("span", { class: "cv-note machine-msg" });
+  const warn = h("span", { class: "warn small machine-msg" });
+  head.append(h("span", { class: "cv-note" }, t("Sort:")), h("div", { class: "cv-seg", role: "group", "aria-label": t("Sort") }, ...sorters), info, warn);
 
-  const warn = h("p", { class: "warn" });
-  const note = h("p", { class: "dim" }, "Waiting for the first snapshot.");
+  const note = h("p", { class: "dim" }, t("Waiting for the first snapshot."));
   const tbody = h("tbody");
   const table = h(
     "table",
-    { class: "procs-table", "aria-label": "Processes with connections" },
-    h("thead", {}, h("tr", {}, ...["", "PID", "Name", "User", "Connections", "Bytes in", "Bytes out"].map((c) => h("th", { scope: "col" }, c)))),
+    { class: "procs-table", "aria-label": t("Processes with connections") },
+    h("thead", {}, h("tr", {}, ...["", "PID", "Name", "User", "Connections", "Bytes in", "Bytes out"].map((c) => h("th", { scope: "col" }, c && t(c))))),
     tbody,
   );
   warn.hidden = true;
   table.hidden = true;
-  list.append(warn, note, table);
+  list.append(note, table);
 
   let last: Snapshot | null = null;
   const toggle = (pid: number) => {
@@ -47,31 +50,44 @@ export function machineView(store: Store): HTMLElement {
 
   const paint = (snap: Snapshot | null) => {
     last = snap;
-    for (const b of sorters) setClass(b, "on", (b as HTMLElement).dataset["sort"] === sort);
+    for (const b of sorters) {
+      const on = (b as HTMLElement).dataset["sort"] === sort;
+      setClass(b, "is-on", on);
+      if (b.getAttribute("aria-pressed") !== String(on)) b.setAttribute("aria-pressed", String(on));
+    }
     const ready = !!snap && new Date(snap.taken).getFullYear() >= 1971;
     const procs = ready ? snap.processes ?? [] : [];
     const conns = ready ? snap.connections ?? [] : [];
-    setText(info, ready ? `source ${snap.source || "unknown"}, ${procs.length} processes, ${conns.length} connections, taken ${ago(snap.taken)}` : "");
+    const infoText = ready ? t("source {source}, {processes}, {connections}, taken {age}").replace("{source}", snap.source || t("unknown")).replace("{processes}", tn(procs.length, "{n} process", "{n} processes")).replace("{connections}", tn(conns.length, "{n} connection", "{n} connections")).replace("{age}", ago(snap.taken)) : "";
+    setText(info, infoText);
+    setTitle(info, infoText);
     const failed = ready && (!snap.supported || !!snap.error);
-    setText(warn, !failed ? "" : snap.supported ? `Last read failed: ${snap.error}` : `The machine view is not available here: ${snap.error ?? "unsupported platform"}`);
+    const warnText = !failed ? "" : snap.supported ? t("Last read failed: {error}").replace("{error}", snap.error ?? "") : t("The machine view is not available here: {error}").replace("{error}", snap.error ?? t("unsupported platform"));
+    setText(warn, warnText);
+    setTitle(warn, warnText);
     setHidden(warn, !failed);
-    setText(note, !ready ? "Waiting for the first snapshot." : "No process with a connection was found.");
-    setHidden(note, ready && procs.length > 0);
-    setHidden(table, procs.length === 0);
+    setHidden(info, failed);
+    setText(note, t(!ready ? "Waiting for the first snapshot." : "No process with a connection was found."));
     const byPid = new Map<number, Connection[]>();
     for (const c of conns) {
       const at = byPid.get(c.pid);
       if (at) at.push(c);
       else byPid.set(c.pid, [c]);
     }
-    const ordered = resort ? sorted(procs, sort) : keepOrder(procs, (p) => String(p.pid), order);
+    const live = new Set(procs.map((p) => p.pid));
+    if (resort) seen.clear();
+    const held = resort ? [] : order.map((k) => seen.get(Number(k))).filter((p): p is Process => !!p && !live.has(p.pid)).map((p) => ({ ...p, connections: 0, bytes_in: 0, bytes_out: 0 }));
+    for (const p of procs) seen.set(p.pid, p);
+    const ordered = resort ? sorted(procs, sort) : keepOrder([...procs, ...held], (p) => String(p.pid), order);
     if (ready) {
       resort = false;
       order = ordered.map((p) => String(p.pid));
     }
+    setHidden(table, ordered.length === 0);
+    setHidden(note, ordered.length > 0);
     const rows: RowItem[] = [];
     for (const p of ordered) {
-      const item = { p, conns: byPid.get(p.pid) ?? [], open: open.has(p.pid) };
+      const item = { p, conns: byPid.get(p.pid) ?? [], open: open.has(p.pid), gone: !live.has(p.pid) };
       rows.push({ ...item, detail: false });
       if (item.open) rows.push({ ...item, detail: true });
     }
@@ -94,6 +110,7 @@ export function machineView(store: Store): HTMLElement {
   };
   store.subscribe(render);
   render(store.get(), { ...store.get(), machine: null });
+  onLanguage(() => { if (!root.hidden) paint(last); });
   return root;
 }
 
@@ -108,6 +125,7 @@ interface RowItem {
   p: Process;
   conns: Connection[];
   open: boolean;
+  gone: boolean;
   detail: boolean;
 }
 
@@ -116,7 +134,7 @@ function procRow(r: RowItem, toggle: (pid: number) => void): HTMLElement {
   const tr = h(
     "tr",
     { class: "proc-row" },
-    h("td", {}, h("button", { type: "button", class: "btn btn-small", onClick: () => toggle(pid) })),
+    h("td", {}, h("button", { type: "button", class: "cv-icon-btn", onClick: () => toggle(pid) })),
     h("td", { class: "num mono" }, pid),
     h("td", {}),
     h("td", { class: "dim" }),
@@ -124,6 +142,7 @@ function procRow(r: RowItem, toggle: (pid: number) => void): HTMLElement {
     h("td", { class: "num mono" }),
     h("td", { class: "num mono" }),
   );
+  (tr.firstElementChild?.firstElementChild as HTMLElement).innerHTML = icon("chevronRight", 14);
   patchProc(tr, r);
   return tr;
 }
@@ -132,10 +151,12 @@ function patchProc(tr: HTMLElement, r: RowItem): void {
   const { p } = r;
   const cells = tr.children;
   const btn = cells[0]?.firstElementChild as HTMLElement;
-  setText(btn, r.open ? "v" : ">");
   if (btn.getAttribute("aria-expanded") !== String(r.open)) btn.setAttribute("aria-expanded", String(r.open));
-  const label = `${r.open ? "Hide" : "Show"} connections of ${p.name}`;
+  const label = t(r.open ? "Hide connections of {name}" : "Show connections of {name}").replace("{name}", p.name);
   if (btn.getAttribute("aria-label") !== label) btn.setAttribute("aria-label", label);
+  setTitle(btn, label);
+  setClass(tr, "is-gone", r.gone);
+  setTitle(tr, r.gone ? t("No connection in the last sample; the row keeps its place until the next sort") : "");
   setText(cells[2] ?? null, p.name);
   setTitle(cells[2] as HTMLElement, p.path ?? "");
   setText(cells[3] ?? null, p.user ?? "");
@@ -149,42 +170,69 @@ function detailRow(r: RowItem): HTMLElement {
   const inner = h(
     "table",
     { class: "conns" },
-    h("thead", {}, h("tr", {}, ...["Proto", "Local", "Remote", "Remote host", "State", "First seen"].map((c) => h("th", { scope: "col" }, c)))),
+    h("thead", {}, h("tr", {}, ...["Proto", "Local", "Remote", "Remote host", "State", "First seen"].map((c) => h("th", { scope: "col" }, t(c))))),
     tbody,
   );
-  const none = h("p", { class: "dim" }, "No connection listed for this process in the last snapshot.");
-  const tr = h("tr", { class: "proc-detail" }, h("td", { colspan: "7" }, inner, none));
+  const none = h("p", { class: "dim" }, t("No connection listed for this process in the last snapshot."));
+  const box = h("div", { class: "conns-box" }, inner, none);
+  setStyleVar(box, "--rows", String(Math.min(10, Math.max(3, r.conns.length))));
+  const tr = h("tr", { class: "proc-detail" }, h("td", { colspan: "7" }, box));
   patchDetail(tr, r);
   return tr;
 }
 
 function patchDetail(tr: HTMLElement, r: RowItem): void {
   const inner = tr.querySelector("table.conns") as HTMLElement;
-  const none = tr.querySelector("td > p") as HTMLElement;
-  const label = `Connections of ${r.p.name}`;
+  const none = tr.querySelector(".conns-box > p") as HTMLElement;
+  const label = t("Connections of {name}").replace("{name}", r.p.name);
   if (inner.getAttribute("aria-label") !== label) inner.setAttribute("aria-label", label);
-  setHidden(inner, r.conns.length === 0);
   setHidden(none, r.conns.length > 0);
   const seen = new Map<string, number>();
-  const items = r.conns.map((c) => {
+  const now = new Map<string, Connection>();
+  for (const c of r.conns) {
     const base = `${c.proto}|${c.local}|${c.remote}`;
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
-    return { c, k: n ? `${base}#${n}` : base };
-  });
-  patchList(inner.querySelector("tbody") as HTMLElement, items, {
-    key: (x) => x.k,
-    create: ({ c }) => {
-      const row = h("tr", {}, h("td", { class: "mono" }, c.proto), h("td", { class: "mono" }, c.local), h("td", { class: "mono" }, c.remote || h("span", { class: "dim" }, "listening")), h("td", {}), h("td", { class: "dim" }), h("td", { class: "mono dim" }));
-      patchConn(row, c);
+    now.set(n ? `${base}#${n}` : base, c);
+  }
+  const slots = slotsOf.get(tr) ?? [];
+  slotsOf.set(tr, slots);
+  const placed = new Set<string>();
+  for (const s of slots) {
+    const c = now.get(s.k);
+    s.gone = !c;
+    if (c) { s.c = c; placed.add(s.k); }
+  }
+  for (const [k, c] of now) {
+    if (placed.has(k)) continue;
+    const free = slots.find((s) => s.gone);
+    if (free) { free.k = k; free.c = c; free.gone = false; } else slots.push({ k, c, gone: false });
+  }
+  patchList(inner.querySelector("tbody") as HTMLElement, slots.map((s, i) => ({ s, i })), {
+    key: (x) => `s${x.i}`,
+    create: ({ s }) => {
+      const row = h("tr", {}, h("td", { class: "mono" }), h("td", { class: "mono" }), h("td", { class: "mono" }), h("td", {}), h("td", { class: "dim" }), h("td", { class: "mono dim" }));
+      patchConn(row, s);
       return row;
     },
-    update: (row, x) => patchConn(row, x.c),
+    update: (row, x) => patchConn(row, x.s),
   });
 }
 
-function patchConn(row: HTMLElement, c: Connection): void {
+/** An open process's connection rows are slots: a connection keeps its row while it lasts, a closed one stays dimmed
+ *  until a new connection takes its row, so no row of the list ever moves. */
+interface Slot { k: string; c: Connection; gone: boolean }
+const slotsOf = new WeakMap<HTMLElement, Slot[]>();
+
+function patchConn(row: HTMLElement, s: Slot): void {
+  const { c } = s;
   const cells = row.children;
+  setClass(row, "is-gone", s.gone);
+  setTitle(row, s.gone ? t("Closed since the last sample") : "");
+  setText(cells[0] ?? null, c.proto);
+  setText(cells[1] ?? null, c.local);
+  setText(cells[2] ?? null, c.remote || t("listening"));
+  setClass(cells[2] ?? null, "dim", !c.remote);
   setText(cells[3] ?? null, c.remote_host ?? "");
   setText(cells[4] ?? null, c.state);
   setText(cells[5] ?? null, clock(c.first_seen));

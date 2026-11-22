@@ -1,4 +1,5 @@
 // Small element builder so views stay readable without a framework.
+import { t } from "./ui/i18n";
 
 type Child = Node | string | number | null | undefined | false;
 
@@ -46,14 +47,17 @@ export async function copyText(value: string): Promise<boolean> {
   }
 }
 
-// copyButton copies value and shows a short confirmation on the button itself.
-export function copyButton(label: string, value: () => string, cls = "btn btn-small"): HTMLElement {
-  const btn = h("button", { type: "button", class: cls }, label);
+// copyButton copies value and shows a short confirmation on the button itself;
+// label is the English, shown in the current language.
+export function copyButton(label: string, value: () => string, cls = "cv-btn cv-btn-ghost"): HTMLElement {
+  const btn = h("button", { type: "button", class: cls }, t(label));
+  let timer = 0;
   btn.addEventListener("click", async () => {
     const ok = await copyText(value());
-    btn.textContent = ok ? "Copied" : "Copy failed";
-    setTimeout(() => {
-      btn.textContent = label;
+    btn.textContent = t(ok ? "Copied" : "Copy failed");
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      btn.textContent = t(label);
     }, 1200);
   });
   return btn;

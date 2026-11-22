@@ -9,6 +9,7 @@ import { exportFilter } from './options-bar';
 import { UI_SCALES, autoUiScale, loadPrefs, setShellZoom, setUiScale, uiScaleChoice } from './prefs';
 import { PREF_PAGES, type SettingsDialog } from './settings-dialog';
 import { readChoice, setTheme } from './themes';
+import { t } from './i18n';
 import { toast } from './toast';
 
 export interface CommandDeps {
@@ -67,13 +68,13 @@ export function registerCommands(d: CommandDeps): Commands {
   c.add(
     { id: 'export-har', label: 'Export HAR...', keys: ['Mod+S'], run: () => download(api.harURL(exportFilter(st.get())), 'formnet.har') },
     { id: 'export-har-secrets', label: 'Export HAR with secrets...', run: () => {
-      void confirmAction('Export HAR with secrets?', 'This file will hold the passwords, tokens and cookies the recorded requests carried (the Authorization, Proxy-Authorization, Cookie and Set-Cookie headers). Anyone who gets the file can sign in as you with them. Keep it private and delete it when you are done. Export HAR leaves them out.', 'Export with secrets', true)
+      void confirmAction('Export HAR with secrets?', t('This file will hold the passwords, tokens and cookies the recorded requests carried (the Authorization, Proxy-Authorization, Cookie and Set-Cookie headers). Anyone who gets the file can sign in as you with them. Keep it private and delete it when you are done. Export HAR leaves them out.'), t('Export with secrets'), true, t('Cancel'))
         .then((ok) => { if (ok) download(api.harURL(exportFilter(st.get()), true), 'formnet-with-secrets.har'); });
     } },
     { id: 'download-ca', label: 'Download Root Certificate...', run: () => download(api.caURL(), 'formnet-ca.pem') },
     { id: 'clear-recording', label: 'Clear Recording', keys: ['Mod+K'], enabled: () => st.get().flows.size > 0, run: () => {
       if (!loadPrefs().confirmClear) { clear(); return; }
-      void confirmAction('Clear the recording?', 'Every flow kept so far is dropped. Export a HAR first if you want to keep them.', 'Clear', true).then((ok) => { if (ok) clear(); });
+      void confirmAction('Clear the recording?', t('Every flow kept so far is dropped. Export a HAR first if you want to keep them.'), t('Clear'), true, t('Cancel')).then((ok) => { if (ok) clear(); });
     } },
     { id: 'undo', label: 'Undo', keys: ['Mod+Z'], run: edit('undo') },
     { id: 'redo', label: 'Redo', keys: ['Shift+Mod+Z'], run: edit('redo') },
@@ -97,7 +98,7 @@ export function registerCommands(d: CommandDeps): Commands {
     { id: 'menus-in-window', label: 'Menus in Window', enabled: () => isTauri() && isMac, checked: menusInWindow, run: () => {
       const on = !menusInWindow();
       store(MENUS_IN_WINDOW_KEY, on ? '1' : '0');
-      toast(on ? 'The menus stay in the window from the next start.' : 'The menus go to the menu bar from the next start.');
+      toast(t(on ? 'The menus stay in the window from the next start.' : 'The menus go to the menu bar from the next start.'));
     } },
     { id: 'custom-title-bar', label: 'Custom Title Bar', enabled: wantsCustomTitleBar, checked: () => { try { return localStorage.getItem('formnet.customTitleBar') === '1'; } catch { return false; } }, run: () => {
       let on = false;
@@ -106,9 +107,9 @@ export function registerCommands(d: CommandDeps): Commands {
       d.captionButtons.sync();
     } },
     { id: 'help', label: 'Proxy Setup...', keys: ['F1'], run: setup('proxy-card') },
-    { id: 'help-trust-root', label: 'Trust the Root Certificate...', run: setup('ca-card') },
-    { id: 'github', label: 'formNET on GitHub', run: () => { window.open('https://github.com/nodemode-dev/formNET', '_blank', 'noopener'); } },
-    { id: 'about', label: 'About formNET', run: () => { const s = st.get().status; toast(`formNET ${s?.version ?? ''} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.`); } },
+    { id: 'help-trust-root', label: 'Trust the Root Certificate...', run: () => d.settings.show('Capture') },
+    { id: 'github', label: 'FormNET on GitHub', run: () => { window.open('https://github.com/nodemode-dev/formNET', '_blank', 'noopener'); } },
+    { id: 'about', label: 'About FormNET', run: () => { const s = st.get().status; toast(t('FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.').replace('{version}', s?.version ?? '').replace('  ', ' ')); } },
   );
   void wantsNativeMenus;
   return c;

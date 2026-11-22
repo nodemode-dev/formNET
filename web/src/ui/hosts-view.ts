@@ -3,14 +3,15 @@ import { keepOrder, patchList, setClass, setHidden, setText, setTitle } from "./
 import { ago, bytes, clock } from "../format.ts";
 import type { State, Store } from "../state.ts";
 import type { HostSummary } from "../types.ts";
+import { onLanguage, t, tn } from "./i18n";
 
 const columns = ["Host", "Label", "Flows", "Pending", "Errors", "Sent", "Received", "First seen", "Last seen", "Processes"];
 
 // hostsView groups the per-host totals by domain. Clicking a host filters the flows table to it.
 export function hostsView(store: Store): HTMLElement {
   const body = h("div", { class: "groups" });
-  const empty = h("div", { class: "empty" }, h("p", {}, "No hosts yet."));
-  const intro = h("p", { class: "dim small" }, "Labels come from a short list of widely documented third parties and are reading aids, not judgements. An unlabelled host is simply not on the list.");
+  const empty = h("div", { class: "cv-hf-empty" }, h("p", {}, t("No hosts yet.")));
+  const intro = h("p", { class: "cv-note" }, t("Labels come from a short list of widely documented third parties and are reading aids, not judgements. An unlabelled host is simply not on the list."));
   const root = h("section", { class: "view view-hosts", role: "tabpanel" }, intro, body, empty);
 
   const pick = (host: string) => store.update({ hostFilter: host, view: "flows" });
@@ -40,6 +41,7 @@ export function hostsView(store: Store): HTMLElement {
   };
   store.subscribe(render);
   render(store.get(), { ...store.get(), hosts: [] });
+  onLanguage(() => render(store.get(), { ...store.get(), hosts: [] }));
   return root;
 }
 
@@ -60,13 +62,13 @@ function group(domain: string, hosts: HostSummary[], pick: (host: string) => voi
       "summary",
       {},
       h("span", { class: "domain" }, domain),
-      h("span", { class: "label", title: "label from the known-host list" }),
+      h("span", { class: "label", title: t("label from the known-host list") }),
       h("span", { class: "dim" }),
     ),
     h(
       "table",
-      { class: "hosts", "aria-label": `Hosts under ${domain}` },
-      h("thead", {}, h("tr", {}, ...columns.map((c) => h("th", { scope: "col" }, c)))),
+      { class: "hosts", "aria-label": t("Hosts under {domain}").replace("{domain}", domain) },
+      h("thead", {}, h("tr", {}, ...columns.map((c) => h("th", { scope: "col" }, t(c))))),
       h("tbody"),
     ),
   );
@@ -82,7 +84,7 @@ function patchGroup(node: HTMLElement, hosts: HostSummary[], pick: (host: string
   const label = node.querySelector("summary > .label") as HTMLElement;
   setText(label, owner);
   setHidden(label, !owner);
-  setText(node.querySelector("summary > .dim"), ` ${hosts.length} host${hosts.length === 1 ? "" : "s"}, ${flows} flows, ${bytes(sent)} sent, ${bytes(received)} received`);
+  setText(node.querySelector("summary > .dim"), ` ${t("{hosts}, {flows}, {sent} sent, {received} received").replace("{hosts}", tn(hosts.length, "{n} host", "{n} hosts")).replace("{flows}", tn(flows, "{n} flow", "{n} flows")).replace("{sent}", bytes(sent)).replace("{received}", bytes(received))}`);
   patchList(node.querySelector("tbody") as HTMLElement, hosts, {
     key: (x) => x.host,
     create: (x) => hostRow(x, pick),
@@ -95,15 +97,15 @@ function hostRow(x: HostSummary, pick: (host: string) => void): HTMLElement {
   const row = h(
     "tr",
     {},
-    h("td", {}, h("button", { type: "button", class: "linkish mono", title: "Show this host's flows", onClick: () => pick(host) }, host), h("span", { class: "kind kind-tunnel", title: "only counted, never opened" }, "tunnel")),
-    h("td", {}, h("span", { class: "label", title: "label from the known-host list" })),
+    h("td", {}, h("button", { type: "button", class: "linkish mono", title: t("Show this host's flows"), onClick: () => pick(host) }, host), h("span", { class: "kind kind-tunnel", title: t("only counted, never opened") }, t("tunnel"))),
+    h("td", {}, h("span", { class: "label", title: t("label from the known-host list") })),
     h("td", { class: "num mono" }),
     h("td", { class: "num mono" }),
     h("td", { class: "num mono" }),
     h("td", { class: "num mono" }),
     h("td", { class: "num mono" }),
     h("td", { class: "mono dim" }),
-    h("td", { class: "mono dim" }),
+    h("td", { class: "dim" }),
     h("td", {}),
   );
   patchHost(row, x);

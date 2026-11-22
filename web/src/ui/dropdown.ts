@@ -63,7 +63,8 @@ export function enhanceSelect(select: HTMLSelectElement, opts: { search?: string
     btn.setAttribute('aria-expanded', 'true');
     const r = btn.getBoundingClientRect(), h = pop.offsetHeight;
     pop.style.minWidth = `${Math.round(r.width)}px`;
-    pop.style.left = `${Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 4))}px`;
+    const start = document.documentElement.dir === 'rtl' ? Math.max(4, r.right - pop.offsetWidth) : r.left;
+    pop.style.left = `${Math.round(Math.min(start, window.innerWidth - pop.offsetWidth - 4))}px`;
     pop.style.top = `${Math.round(r.bottom + 4 + h <= window.innerHeight - 4 ? r.bottom + 4 : Math.max(4, r.top - 4 - h))}px`;
     (search ?? (list.querySelector('.is-chosen') as HTMLElement | null) ?? btn).focus();
     (list.querySelector('.is-chosen') as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
