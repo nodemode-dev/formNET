@@ -147,7 +147,7 @@ export const el: Record<string, string> = {
   "Flows": "Ροές",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Οι ροές που κρατούνται και πόσες δείχνει το φίλτρο. Κάντε κλικ για την επόμενη ένδειξη, Shift+κλικ για την προηγούμενη.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "Το FormNET δημιούργησε αυτό το ριζικό πιστοποιητικό σε αυτόν τον υπολογιστή. Το ιδιωτικό του κλειδί μένει στον φάκελο δεδομένων και δεν σερβίρεται ποτέ. Μόνο το πιστοποιητικό μπορεί να ληφθεί. Τίποτα δεν εγκαθίσταται μέχρι να εκτελέσετε εσείς την εντολή και στο Αυτόματο το HTTPS αποκρυπτογραφείται μόνο όταν αυτός ο υπολογιστής εμπιστεύεται το ριζικό πιστοποιητικό.",
-  "FormNET on GitHub": "FormNET στο GitHub",
+  "FormNET Website": "Ιστότοπος του FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} από την NodeAgentc, Inc.: τι κάνει πραγματικά στο δίκτυο ένας ιστότοπος, μια εφαρμογή ή ολόκληρος ο υπολογιστής.",
   "Good afternoon": "Καλό απόγευμα",
   "Good evening": "Καλησπέρα",

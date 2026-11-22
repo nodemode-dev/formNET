@@ -147,7 +147,7 @@ export const hi: Record<string, string> = {
   "Flows": "फ़्लो",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "रखे गए फ़्लो, और फ़िल्टर कितने दिखाता है। अगले मान के लिए क्लिक करें, पिछले के लिए Shift+क्लिक करें।",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET ने यह रूट इस कंप्यूटर पर बनाया है। इसकी निजी कुंजी डेटा फ़ोल्डर में रहती है और कभी परोसी नहीं जाती; केवल प्रमाणपत्र डाउनलोड हो सकता है। जब तक आप कमांड खुद नहीं चलाते, कुछ इंस्टॉल नहीं होता, और स्वचालित मोड में HTTPS तभी डिक्रिप्ट होता है जब यह कंप्यूटर रूट पर भरोसा करने लगता है।",
-  "FormNET on GitHub": "GitHub पर FormNET",
+  "FormNET Website": "FormNET वेबसाइट",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "NodeAgentc, Inc. का FormNET {version}: कोई वेबसाइट, ऐप या पूरी मशीन नेटवर्क पर असल में क्या करती है।",
   "Good afternoon": "शुभ अपराह्न",
   "Good evening": "शुभ संध्या",

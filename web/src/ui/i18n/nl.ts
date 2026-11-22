@@ -146,7 +146,7 @@ export const nl: Record<string, string> = {
   "Flows": "Flows",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Bewaarde flows en hoeveel het filter er toont. Klik voor de volgende waarde, Shift+klik voor de vorige.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET heeft dit rootcertificaat op deze computer gemaakt. De privésleutel blijft in de gegevensmap en wordt nooit aangeboden; alleen het certificaat kan worden gedownload. Er wordt niets geïnstalleerd totdat je de opdracht zelf uitvoert, en bij Auto wordt HTTPS pas ontsleuteld zodra deze computer het rootcertificaat vertrouwt.",
-  "FormNET on GitHub": "FormNET op GitHub",
+  "FormNET Website": "Website van FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} van NodeAgentc, Inc.: wat een website, een app of de hele computer echt doet op het netwerk.",
   "Good afternoon": "Goedemiddag",
   "Good evening": "Goedenavond",

@@ -146,7 +146,7 @@ export const fi: Record<string, string> = {
   "Flows": "Virrat",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Säilytetyt virrat ja kuinka monta suodatin näyttää. Napsauta nähdäksesi seuraavan arvon, Shift+napsautus näyttää edellisen.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET loi tämän juurivarmenteen tälle tietokoneelle. Sen yksityinen avain pysyy datakansiossa eikä sitä koskaan tarjota; vain varmenteen voi ladata. Mitään ei asenneta, ennen kuin suoritat komennon itse, ja Automaattinen-tilassa HTTPS-salaus puretaan vasta, kun tämä tietokone luottaa juurivarmenteeseen.",
-  "FormNET on GitHub": "FormNET GitHubissa",
+  "FormNET Website": "FormNETin verkkosivusto",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}, NodeAgentc, Inc.: mitä verkkosivusto, sovellus tai koko tietokone todella tekee verkossa.",
   "Good afternoon": "Hyvää iltapäivää",
   "Good evening": "Hyvää iltaa",
