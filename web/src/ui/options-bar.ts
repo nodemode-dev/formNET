@@ -3,6 +3,7 @@ import type { FlowFilter } from '../api.ts';
 import type { State, Store } from '../state.ts';
 import { visibleFlows } from '../state.ts';
 import { el, q, setClass, setHidden, setText } from './dom';
+import { t, tn } from './i18n';
 import { icon } from './icons';
 
 /** The part of the page's filter the server's export honours: the text filter and the host chosen in Hosts. */
@@ -24,14 +25,14 @@ export class OptionsBar {
 
   constructor(host: HTMLElement, store: Store) {
     host.insertAdjacentHTML('beforeend',
-      '<span class="cv-opt-title">Flows</span>' +
-      '<div class="cv-opt cv-opt-filter"><input class="cv-opt-input filter" type="search" placeholder="Filter flows (press / )" aria-label="Filter flows" autocomplete="off" spellcheck="false">' +
-      `<button class="cv-opt-chip" type="button" title="Remove the host filter" hidden><span class="cv-opt-chip-text"></span>${icon('close', 12)}</button></div>` +
+      `<span class="cv-opt-title">${t('Flows')}</span>` +
+      `<div class="cv-opt cv-opt-filter"><input class="cv-opt-input filter" type="search" placeholder="${t('Filter flows (press / )')}" aria-label="${t('Filter flows')}" autocomplete="off" spellcheck="false">` +
+      `<button class="cv-opt-chip" type="button" title="${t('Remove the host filter')}" hidden><span class="cv-opt-chip-text"></span>${icon('close', 12)}</button></div>` +
       '<span class="cv-sep"></span>' +
       '<button class="cv-btn cv-opt-live" type="button" data-cmd="live" aria-pressed="true"></button>' +
-      '<button class="cv-btn" type="button" data-cmd="clear-recording">Clear</button>' +
-      '<a class="cv-btn cv-opt-export" download="formnet.har" title="HAR of the flows matching the text and host filter, as the server applies them; passwords, tokens and cookies are left out">Export HAR</a>' +
-      '<button class="cv-btn cv-btn-ghost" type="button" data-cmd="export-har-secrets">Export HAR with secrets...</button>' +
+      `<button class="cv-btn" type="button" data-cmd="clear-recording">${t('Clear')}</button>` +
+      `<a class="cv-btn cv-opt-export" download="formnet.har" title="${t('HAR of the flows matching the text and host filter, as the server applies them; passwords, tokens and cookies are left out')}">${t('Export HAR')}</a>` +
+      `<button class="cv-btn cv-btn-ghost" type="button" data-cmd="export-har-secrets">${t('Export HAR with secrets...')}</button>` +
       '<span class="cv-opt-counts" aria-live="polite"></span>');
     this.filter = q<HTMLInputElement>(host, 'input.filter');
     this.chip = q<HTMLButtonElement>(host, '.cv-opt-chip');
@@ -42,17 +43,17 @@ export class OptionsBar {
     this.filter.addEventListener('input', () => store.update({ filter: this.filter.value }));
     this.chip.addEventListener('click', () => store.update({ hostFilter: '' }));
     const render = (s: State): void => {
-      setText(this.title, VIEW_NAMES[s.view]);
+      setText(this.title, t(VIEW_NAMES[s.view]));
       if (this.filter.value !== s.filter && document.activeElement !== this.filter) this.filter.value = s.filter;
-      setText(q(this.chip, '.cv-opt-chip-text'), s.hostFilter ? `host: ${s.hostFilter}` : '');
+      setText(q(this.chip, '.cv-opt-chip-text'), s.hostFilter ? t('host: {host}').replace('{host}', s.hostFilter) : '');
       setHidden(this.chip, !s.hostFilter);
-      setText(this.live, s.live ? 'Live' : 'Paused');
+      setText(this.live, t(s.live ? 'Live' : 'Paused'));
       setClass(this.live, 'is-on', s.live);
       if (this.live.getAttribute('aria-pressed') !== String(s.live)) this.live.setAttribute('aria-pressed', String(s.live));
       const href = api.harURL(exportFilter(s));
       if (this.exportLink.getAttribute('href') !== href) this.exportLink.href = href;
       const shown = visibleFlows(s).length;
-      setText(this.counts, shown === s.flows.size ? `${s.flows.size} flows` : `${shown} of ${s.flows.size} flows`);
+      setText(this.counts, shown === s.flows.size ? tn(s.flows.size, '{n} flow', '{n} flows') : t('{shown} of {total} flows').replace('{shown}', String(shown)).replace('{total}', String(s.flows.size)));
     };
     store.subscribe(render);
     render(store.get());
@@ -61,4 +62,4 @@ export class OptionsBar {
   focus(): void { this.filter.focus(); this.filter.select(); }
 }
 
-export const viewTab = (id: string, label: string): HTMLElement => el(`<button class="cv-tab" type="button" role="tab" data-view="${id}"><span class="cv-tab-name">${label}</span></button>`);
+export const viewTab = (id: string, label: string): HTMLElement => el(`<button class="cv-tab" type="button" role="tab" data-view="${id}"><span class="cv-tab-name">${t(label)}</span></button>`);

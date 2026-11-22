@@ -3,16 +3,18 @@ import { boot as bootSession } from './session.ts';
 import { Store } from './state.ts';
 import { startApp } from './ui/app.ts';
 import { revealApp } from './ui/dom';
-import { startLanguage } from './ui/i18n';
+import { startLanguage, t } from './ui/i18n';
 import { applyTheme } from './ui/themes';
 
 /** No session: the page was opened without this run's token. The views never mount; the note says where the address is. */
 function lostSession(): void {
   const root = document.getElementById('app');
+  const code: Record<string, string> = { '{serve}': 'formnet serve', '{open}': 'formnet open' };
+  const text = t('This FormNET page has no session. Open FormNET from the address printed by {serve}, or run {open}.');
   root?.replaceChildren(
     h('div', { class: 'session-lost', role: 'alert' },
-      h('h1', {}, 'No session'),
-      h('p', {}, 'This formNET page has no session. Open formNET from the address printed by ', h('code', {}, 'formnet serve'), ', or run ', h('code', {}, 'formnet open'), '.')),
+      h('h1', {}, t('No session')),
+      h('p', {}, ...text.split(/(\{serve\}|\{open\})/).map((part) => (code[part] ? h('code', {}, code[part]) : part)))),
   );
   revealApp();
 }
