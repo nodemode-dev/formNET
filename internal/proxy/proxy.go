@@ -135,7 +135,18 @@ func (p *Proxy) ListenAndServe(ctx context.Context, addr string) error {
 		p.setError(err)
 		return fmt.Errorf("proxy: listen %s: %w", addr, err)
 	}
-	p.setRunning(ln.Addr().String(), true)
+	return p.Serve(ctx, ln)
+}
+
+// Serve serves on a loopback listener the caller bound until ctx ends.
+func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
+	addr := ln.Addr().String()
+	if err := requireLoopback(addr); err != nil {
+		_ = ln.Close()
+		p.setError(err)
+		return err
+	}
+	p.setRunning(addr, true)
 	p.log.Info("proxy listening", "addr", ln.Addr().String())
 	srv := &http.Server{Handler: p, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second}
 	done := make(chan struct{})
@@ -149,7 +160,7 @@ func (p *Proxy) ListenAndServe(ctx context.Context, addr string) error {
 		case <-done:
 		}
 	}()
-	err = srv.Serve(ln)
+	err := srv.Serve(ln)
 	close(done)
 	p.setRunning(addr, false)
 	p.transport.CloseIdleConnections()

@@ -148,6 +148,7 @@ export interface Status {
   proxy: ProxyStatus;
   ca: CAInfo;
   machine: MachineStatus;
+  notices?: string[] | null;
   now: string;
 }
 
