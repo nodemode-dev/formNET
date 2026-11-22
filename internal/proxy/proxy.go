@@ -34,11 +34,12 @@ const (
 
 // Status is what the API reports about the proxy.
 type Status struct {
-	Addr        string   `json:"addr"`
-	Running     bool     `json:"running"`
-	Intercept   bool     `json:"intercept"`
-	Passthrough []string `json:"passthrough"`
-	Error       string   `json:"error,omitempty"`
+	Addr          string   `json:"addr"`
+	Running       bool     `json:"running"`
+	Intercept     bool     `json:"intercept"`
+	InterceptMode string   `json:"intercept_mode"` // auto (follows the root's trust), on or off
+	Passthrough   []string `json:"passthrough"`
+	Error         string   `json:"error,omitempty"`
 }
 
 // Options configure a Proxy.
@@ -48,6 +49,11 @@ type Options struct {
 	BodyLimit   int64
 	Passthrough []string
 	Intercept   bool
+	// InterceptMode is auto, on or off; empty means on when Intercept is set, off otherwise.
+	// In auto, HTTPS is opened while Trusted reports true, read again every TrustInterval.
+	InterceptMode string
+	Trusted       func() bool
+	TrustInterval time.Duration
 	// Owner names the local program behind a client address (ip:port), when known.
 	Owner func(clientAddr string) (pid int, name string, ok bool)
 	Log   *slog.Logger
@@ -77,9 +83,16 @@ type Proxy struct {
 	mu          sync.Mutex
 	status      Status
 	intercept   bool
+	mode        string
 	passthrough []string
 	hijacked    map[net.Conn]struct{}
+
+	refusedMu sync.Mutex
+	refused   map[string]time.Time // last refused handshake per program and host
 }
+
+// DefaultTrustInterval is how often auto mode reads the root's trust state again.
+const DefaultTrustInterval = 10 * time.Second
 
 // New prepares a proxy; ListenAndServe starts it.
 func New(opts Options) *Proxy {
@@ -92,14 +105,25 @@ func New(opts Options) *Proxy {
 	if opts.TunnelIdle <= 0 {
 		opts.TunnelIdle = DefaultTunnelIdle
 	}
+	if opts.TrustInterval <= 0 {
+		opts.TrustInterval = DefaultTrustInterval
+	}
 	log := opts.Log
 	if log == nil {
 		log = slog.Default()
 	}
+	mode := opts.InterceptMode
+	if mode == "" {
+		mode = ModeOff
+		if opts.Intercept {
+			mode = ModeOn
+		}
+	}
 	p := &Proxy{
 		opts:        opts,
 		log:         log,
-		intercept:   opts.Intercept,
+		mode:        mode,
+		intercept:   mode == ModeOn || (mode == ModeAuto && opts.Trusted != nil && opts.Trusted()),
 		passthrough: append([]string(nil), opts.Passthrough...),
 		hijacked:    map[net.Conn]struct{}{},
 		guard:       newGuard(opts.Refuse, opts.Resolver),
@@ -148,6 +172,7 @@ func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 	}
 	p.setRunning(addr, true)
 	p.log.Info("proxy listening", "addr", ln.Addr().String())
+	go p.followTrust(ctx)
 	srv := &http.Server{Handler: p, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second}
 	done := make(chan struct{})
 	go func() {
