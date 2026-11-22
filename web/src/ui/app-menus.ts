@@ -6,5 +6,6 @@ export const menus = (): MenuDef[] => [
   { label: 'File', items: ['export-har', 'export-har-secrets', 'download-ca', '-', 'clear-recording'] },
   { label: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'select-all', '-', 'find', '-', { label: 'Preferences', items: ['settings', '-', ...PREF_PAGES.map(([id]) => `prefs-${id}`)] }] },
   { label: 'View', items: ['view-flows', 'view-hosts', 'view-machine', 'view-setup', '-', 'home', '-', 'live', '-', 'terminal', 'terminal-new', '-', 'zoom-in', 'zoom-out', 'zoom-reset', '-', 'theme-toggle', '-', 'menus-in-window', 'custom-title-bar'] },
+  { label: 'Tools', items: ['rules-toggle', '-', 'tool-rewrite', 'tool-map-local', 'tool-map-remote', 'tool-block', '-', 'breakpoints-show', 'tool-breakpoint-rules', '-', 'prefs-throttle', 'prefs-devices'] },
   { label: 'Help', items: ['help', 'help-trust-root', '-', 'github', 'about'] },
 ];

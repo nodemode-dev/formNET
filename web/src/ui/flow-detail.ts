@@ -7,6 +7,7 @@ import { patchList, setClass, setDisabled, setHidden, setText, setTitle, swapMed
 import { onLanguage, t } from "./i18n";
 import { icon } from "./icons";
 import { ResendDialog } from "./resend-dialog";
+import { ruleFromFlow } from "./panels/rules";
 import { toast } from "./toast";
 
 type Tab = "summary" | "request" | "response" | "timing";
@@ -131,7 +132,11 @@ function kv(labels: string[]): { el: HTMLElement; set: (values: (string | number
 function summaryPane(store: Store): Pane {
   let f: FlowDetail | null = null;
   const odd = h("span", { class: "warn small" }, t("method contains unusual characters"));
-  const rows = kv(["Kind", "Status", "Protocol", "Started", "Duration", "Client", "Host", "TLS", "Sent", "Received", "Request type", "Response type"]);
+  const rows = kv(["Kind", "Status", "Protocol", "Started", "Duration", "Client", "Host", "TLS", "Sent", "Received", "Request type", "Response type", "Rules", "Notes"]);
+  const [rulesDd, notesDd] = Array.from(rows.el.querySelectorAll<HTMLElement>("dd")).slice(12, 14);
+  for (const dd of [rulesDd, notesDd]) dd?.classList.add("kv-one");
+  const ruleBtn = h("button", { type: "button", class: "cv-btn cv-btn-ghost", onClick: () => { if (f) ruleFromFlow(store, f); } }, t("Make a Rule...")) as HTMLButtonElement;
+  const bpBtn = h("button", { type: "button", class: "cv-btn cv-btn-ghost", onClick: () => document.dispatchEvent(new CustomEvent("formnet:run", { detail: "breakpoints-show" })) }, t("Open Breakpoints")) as HTMLButtonElement;
   const refusedError = h("p", { class: "st-error mono" });
   const addBtn = h("button", { type: "button", class: "cv-btn", onClick: () => { if (f) addToPassthrough(store, f.host); } });
   const refused = h(
@@ -148,7 +153,7 @@ function summaryPane(store: Store): Pane {
   const resendLabel = h("span", {}, t("Resend"));
   resendBtn.append(resendLabel);
   const editBtn = h("button", { type: "button", class: "cv-btn cv-btn-ghost", onClick: () => { if (f) editAndResend(store, f); } }, t("Edit and resend...")) as HTMLButtonElement;
-  const resendRow = h("div", { class: "cv-improve detail-resend" }, resendBtn, editBtn);
+  const resendRow = h("div", { class: "cv-improve detail-resend" }, resendBtn, editBtn, ruleBtn, bpBtn);
   const fromLink = h("button", { type: "button", class: "linkish mono", onClick: () => {
     const orig = f?.resent_from;
     if (orig && store.get().flows.has(orig)) store.update({ selectedId: orig });
@@ -165,6 +170,10 @@ function summaryPane(store: Store): Pane {
       setDisabled(editBtn, f.kind !== "http");
       setText(resendLabel, t("Resend"));
       setText(editBtn, t("Edit and resend..."));
+      setDisabled(ruleBtn, f.kind !== "http");
+      setText(ruleBtn, t("Make a Rule..."));
+      setDisabled(bpBtn, !f.paused);
+      setText(bpBtn, t("Open Breakpoints"));
       const orig = f.resent_from ? store.get().flows.get(f.resent_from) : undefined;
       setText(fromLink, !f.resent_from ? "" : orig ? `${clock(orig.start)} ${orig.method} ${orig.url}` : t("a flow no longer kept"));
       setTitle(fromLink, orig ? t("Show the original flow") : "");
@@ -176,7 +185,7 @@ function summaryPane(store: Store): Pane {
       setHidden(odd, plainMethod.test(f.method));
       rows.set([
         f.kind,
-        f.error ? t("error: {error}").replace("{error}", f.error) : f.status || (f.pending ? t("pending") : ""),
+        f.error ? t("error: {error}").replace("{error}", f.error) : f.paused ? t(f.paused === "response" ? "paused at the response" : "paused at the request") : f.status || (f.pending ? t("pending") : ""),
         f.protocol,
         dateTime(f.start),
         f.pending ? t("pending") : millis(f.duration_ms),
@@ -187,7 +196,10 @@ function summaryPane(store: Store): Pane {
         bytes(f.bytes_received),
         f.request.content_type,
         f.response?.content_type,
+        (f.rules ?? []).join(", "),
+        (f.notes ?? []).join(" "),
       ]);
+      for (const dd of [rulesDd, notesDd]) if (dd) setTitle(dd, dd.textContent ?? "");
       setHidden(refused, f.kind !== "refused");
       setText(refusedError, f.error ?? "");
       setText(addBtn, t("Add {host} to passthrough").replace("{host}", f.host));

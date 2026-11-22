@@ -7,6 +7,10 @@ import { checkRow, labelText, selectRow, sliderRow, tf } from './panels/controls
 import { AgentsSection } from './panels/agents';
 import { HttpsSection, PassthroughSection, ProxySection, RootSection } from './panels/capture';
 import { StorageSection } from './panels/storage';
+import { BreakpointSettingsSection, RulesSection } from './panels/rules';
+import { ThrottleSection } from './panels/throttle';
+import { DevicesSection } from './panels/devices';
+import type { RuleActionType } from '../types-traffic';
 import { SystemProxySection } from './panels/system-proxy';
 import { MACHINE_SORTS, PREFIX, UI_FONT_SIZES, UI_SCALES, loadPrefs, savePrefs, setUiScale, uiScaleChoice, type MachineSort, type Prefs, type UiFontSize } from './prefs';
 import { STORAGE_KEY, THEMES, readChoice, setAccent, setIntensity, setTheme, themeSwatchesHtml } from './themes';
@@ -20,11 +24,14 @@ export const PREF_PAGES: ReadonlyArray<readonly [string, string, string]> = [
   ['interface', 'Interface...', 'Interface'],
   ['capture', 'Capture...', 'Capture'],
   ['machine', 'Machine...', 'Machine'],
+  ['rules', 'Rules...', 'Rules'],
+  ['throttle', 'Throttle...', 'Throttle'],
+  ['devices', 'Other Devices...', 'Other Devices'],
   ['agents', 'Agents and Scripts...', 'Agents and Scripts'],
 ];
 
 const ORDER = PREF_PAGES.map(([, , name]) => name);
-const RAIL_ICONS: Record<string, string> = { General: 'pfGeneral', Interface: 'pfInterface', Capture: 'pfPerformance', Machine: 'pfScratch', 'Agents and Scripts': 'pfPlugins' };
+const RAIL_ICONS: Record<string, string> = { General: 'pfGeneral', Interface: 'pfInterface', Capture: 'pfPerformance', Machine: 'pfScratch', Rules: 'rules', Throttle: 'throttle', 'Other Devices': 'devices', 'Agents and Scripts': 'pfPlugins' };
 const RAIL_KEY = `${PREFIX}prefsRailCollapsed`;
 
 /** Preferences: a floating rail of section tabs beside one scrolling pane of foldable section cards, a wire from the
@@ -67,6 +74,10 @@ export class SettingsDialog extends Dialog {
   private readonly proxy: ProxySection;
   private readonly sysproxy: SystemProxySection;
   private readonly agents = new AgentsSection();
+  private readonly rules: RulesSection;
+  private readonly bpSettings = new BreakpointSettingsSection();
+  private readonly throttle: ThrottleSection;
+  private readonly devices: DevicesSection;
 
   constructor(private readonly deps: SettingsDeps) {
     super('Preferences', 620);
@@ -75,6 +86,9 @@ export class SettingsDialog extends Dialog {
     this.passthrough = new PassthroughSection(deps.store);
     this.proxy = new ProxySection(deps.store);
     this.sysproxy = new SystemProxySection(deps.store);
+    this.rules = new RulesSection(deps.store);
+    this.throttle = new ThrottleSection(deps.store);
+    this.devices = new DevicesSection(deps.store);
     const swatches = document.createElement('template');
     swatches.innerHTML = themeSwatchesHtml();
     this.grid.append(swatches.content);
@@ -141,6 +155,9 @@ export class SettingsDialog extends Dialog {
     add('Machine',
       grp('Sampling', nt('The connection table is read every FORMNET_MACHINE_INTERVAL (2 s unless set), with the tools the system already has: lsof, ps and nettop on macOS, /proc on Linux, netstat on Windows. No privileges are needed. Reverse DNS is off unless FORMNET_REVERSE_DNS=1, and a name is shown only when it resolves back to the address.')),
       grp('Display', this.machineSortRow.el, nt('The order the process list opens in; the buttons above the list change it for the session.')));
+    add('Rules', grp('Rules', this.rules.el), grp('Breakpoints', this.bpSettings.el));
+    add('Throttle', grp('Throttle', this.throttle.el));
+    add('Other Devices', grp('Capture from Other Devices', this.devices.el));
     add('Agents and Scripts', grp('API', this.agents.el));
     for (const name of ORDER) {
       const tab = this.nav.querySelector<HTMLElement>(`[data-section="${name}"]`), card = this.sections.get(name);
@@ -239,6 +256,16 @@ export class SettingsDialog extends Dialog {
     this.proxy.refresh(status);
     this.sysproxy.refresh(status);
     this.agents.refresh(status);
+    this.rules.refresh(status);
+    this.bpSettings.refresh(status);
+    this.throttle.refresh(status);
+    this.devices.refresh(status);
+  }
+
+  /** Preferences at Rules, the list showing only rules of `type` (every rule when null): Tools > Rewrite, Map Local... */
+  showRules(type: RuleActionType | null): void {
+    this.rules.showType(type);
+    this.show('Rules');
   }
 
   private showSection(name: string, scroll: ScrollBehavior | null = null): void {

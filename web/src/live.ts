@@ -1,4 +1,6 @@
 import { api, onUnauthorized, openStream, SessionError } from './api.ts';
+import { breakpointWatch } from './breakpoint-watch.ts';
+import { mountBreakpointPanel } from './ui/breakpoint-dialog.ts';
 import type { Store } from './state.ts';
 import { applyFlowEvents, withFlows } from './state.ts';
 import type { FlowEvent } from './types.ts';
@@ -39,6 +41,7 @@ export function connectLive(store: Store, onLost: () => void): () => void {
     onLost();
   };
   onUnauthorized(lostSession);
+  mountBreakpointPanel();
   const stopStream = openStream({
     hello: (hello) => {
       const s = store.get();
@@ -49,14 +52,17 @@ export function connectLive(store: Store, onLost: () => void): () => void {
       refreshStatus();
       refreshHosts();
       api.machine().then((machine) => store.update({ machine })).catch(() => undefined);
+      breakpointWatch.start();
+      breakpointWatch.refresh();
     },
     resync: () => { pending = []; reloadFlows(); },
     close: () => store.update({ connected: false }),
     unauthorized: lostSession,
-    flow: (e) => { pending = [...pending, e]; if (!frame) frame = requestAnimationFrame(flush); },
+    flow: (e) => { pending = [...pending, e]; if (!frame) frame = requestAnimationFrame(flush); if (e.flow) breakpointWatch.sawFlow(e.flow); },
     machine: (machine) => store.update({ machine }),
+    breakpoint: (e) => breakpointWatch.event(e),
   });
   const timer = window.setInterval(() => { if (document.visibilityState === 'visible' && !store.get().sessionLost) refreshStatus(); }, 10000);
-  const stop = (): void => { stopStream(); window.clearInterval(timer); };
+  const stop = (): void => { stopStream(); window.clearInterval(timer); breakpointWatch.stop(); };
   return stop;
 }
