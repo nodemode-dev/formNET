@@ -1,8 +1,10 @@
 import { h } from "../dom.ts";
 import { bytes, clock, kindLabel, methodClass, millis, pathWithQuery, shortType, statusClass } from "../format.ts";
+import { flowFilters, flowQuery, parseTyped } from "../filters.ts";
 import type { State, Store } from "../state.ts";
 import { visibleFlows } from "../state.ts";
 import type { Flow } from "../types.ts";
+import { flowData } from "../types-data.ts";
 import { setText, setTitle } from "./dom";
 import { language, onLanguage, t, tn } from "./i18n";
 import { icon } from "./icons";
@@ -145,7 +147,9 @@ export function flowsView(store: Store): HTMLElement {
   const paintNotes = (shown: number, total: number, newest: boolean) => {
     notes = { shown, total, newest };
     const n = (x: number) => x.toLocaleString(language());
-    setText(note, shown < total ? t(newest ? "showing the newest {shown} of {total} matching flows" : "showing {shown} of {total} matching flows").replace("{shown}", n(shown)).replace("{total}", n(total)) : "");
+    const showing = shown < total ? t(newest ? "showing the newest {shown} of {total} matching flows" : "showing {shown} of {total} matching flows").replace("{shown}", n(shown)).replace("{total}", n(total)) : "";
+    const cut = flowFilters.get().body && !!parseTyped(store.get().filter).rest &&!!flowQuery()?.get().bodyCut;
+    setText(note, [showing, cut ? t("body search stopped early: older flows were not searched") : ""].filter(Boolean).join(" · "));
     const text = heldText();
     setText(held, text);
     const vis = text ? "" : "hidden";
@@ -162,15 +166,15 @@ export function flowsView(store: Store): HTMLElement {
     known = s.flows;
     root.hidden = s.view !== "flows";
     if (root.hidden) return;
-    const listChanged = s.flows !== prev.flows || s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.live !== prev.live || s.view !== prev.view || s.maxRows !== prev.maxRows;
+    const listChanged = s.flows !== prev.flows || s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.live !== prev.live || s.view !== prev.view || s.maxRows !== prev.maxRows || s.filterEpoch !== prev.filterEpoch;
     if (listChanged) {
       let flows: Flow[];
       let keepRows = true;
-      if (!s.live && frozen && s.filter === prev.filter && s.hostFilter === prev.hostFilter) {
+      if (!s.live && frozen && s.filter === prev.filter && s.hostFilter === prev.hostFilter && s.filterEpoch === prev.filterEpoch) {
         flows = frozen.map((f) => s.flows.get(f.id) ?? f);
       } else {
         const all = visibleFlows(s);
-        const fresh = s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.maxRows !== prev.maxRows || s.view !== prev.view;
+        const fresh = s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.maxRows !== prev.maxRows || s.view !== prev.view || s.filterEpoch !== prev.filterEpoch;
         keepRows = !fresh;
         const [from, to] = windowOf(all, s.maxRows, fresh);
         flows = all.slice(from, to);
@@ -235,6 +239,8 @@ function relabel(tr: HTMLTableRowElement, f: Flow): void {
   if (kind) setText(kind, t(kindLabel(f.kind)));
   const mark = c[4]?.querySelector<HTMLElement>(".resent-mark");
   if (mark) { setTitle(mark, resentText(f)); mark.setAttribute("aria-label", mark.title); }
+  const from = c[4]?.querySelector<HTMLElement>(".session-mark");
+  if (from) { setTitle(from, sessionText(f)); from.setAttribute("aria-label", from.title); }
   for (const kind of ["paused", "rules", "throttled"] as const) {
     const m = c[4]?.querySelector<HTMLElement>(`.traffic-${kind}`);
     if (m) { setTitle(m, trafficText(kind, f)); m.setAttribute("aria-label", m.title); }
@@ -268,6 +274,15 @@ function trafficMarks(f: Flow): HTMLElement[] {
   return out;
 }
 
+const sessionText = (f: Flow): string => t(flowData(f).imported === "har" ? "Imported from a HAR file" : "Opened from a session file");
+
+function sessionMark(f: Flow): HTMLElement {
+  const text = sessionText(f);
+  const mark = h("span", { class: "session-mark", role: "img", title: text, "aria-label": text });
+  mark.innerHTML = icon("folderOpen", 12);
+  return mark;
+}
+
 function resentMark(f: Flow): HTMLElement {
   const text = resentText(f);
   const mark = h("span", { class: "resent-mark", role: "img", title: text, "aria-label": text });
@@ -285,7 +300,7 @@ function buildRow(f: Flow, select: (id: string) => void): HTMLTableRowElement {
     h("td", { class: "proc", title: f.client_pid ? t("pid {pid}, {client}").replace("{pid}", String(f.client_pid)).replace("{client}", f.client) : f.client }, f.client_process ?? ""),
     h("td", { class: `mono ${methodClass(f.method)}` }, f.method),
     h("td", { class: "host" }, f.host, f.port && f.port !== 443 && f.port !== 80 ? h("span", { class: "dim" }, `:${f.port}`) : null),
-    h("td", { class: "path mono", title: f.url }, f.resent_from ? resentMark(f) : null, ...trafficMarks(f), kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
+    h("td", { class: "path mono", title: f.url }, flowData(f).from_session ? sessionMark(f) : null, f.resent_from ? resentMark(f) : null, ...trafficMarks(f), kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
     h("td", { class: `status mono ${statusClass(f.status, f.error)}`, title: f.error ?? "" }, status),
     h("td", { class: "type" }, shortType(f.response?.content_type)),
     h("td", { class: "num mono" }, bytes(f.bytes_sent)),

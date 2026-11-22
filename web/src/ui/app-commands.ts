@@ -5,7 +5,11 @@ import { confirmAction } from './dialogs';
 import { isMac } from './dom';
 import { MENUS_IN_WINDOW_KEY, menusInWindow, wantsNativeMenus } from './native-menu';
 import { wantsCustomTitleBar } from './caption-buttons';
-import { exportFilter } from './options-bar';
+import { exportParams } from './options-bar';
+import { dataApi } from '../api-data.ts';
+import { dataOf } from '../types-data.ts';
+import { copyAllAsCurl } from './curl-dialog';
+import { closeSession, importHar, openSession, saveSession } from './session-dialog';
 import { UI_SCALES, autoUiScale, loadPrefs, setShellZoom, setUiScale, uiScaleChoice } from './prefs';
 import { PREF_PAGES, type SettingsDialog } from './settings-dialog';
 import { showBreakpoints } from './breakpoint-dialog';
@@ -70,11 +74,20 @@ export function registerCommands(d: CommandDeps): Commands {
   const setup = (card: string) => (): void => { st.update({ view: 'setup' }); d.home.dismiss(); requestAnimationFrame(() => document.getElementById(card)?.scrollIntoView({ block: 'start' })); };
   const clear = (): void => { api.clearFlows().catch((err: Error) => st.update({ notice: err.message })); };
   c.add(
-    { id: 'export-har', label: 'Export HAR...', keys: ['Mod+S'], run: () => download(api.harURL(exportFilter(st.get())), 'formnet.har') },
+    { id: 'export-har', label: 'Export HAR...', keys: ['Mod+S'], run: () => download(dataApi.harURL(exportParams(st.get())), 'formnet.har') },
     { id: 'export-har-secrets', label: 'Export HAR with secrets...', run: () => {
       void confirmAction('Export HAR with secrets?', t('This file will hold the passwords, tokens and cookies the recorded requests carried (the Authorization, Proxy-Authorization, Cookie and Set-Cookie headers). Anyone who gets the file can sign in as you with them. Keep it private and delete it when you are done. Export HAR leaves them out.'), t('Export with secrets'), true, t('Cancel'))
-        .then((ok) => { if (ok) download(api.harURL(exportFilter(st.get()), true), 'formnet-with-secrets.har'); });
+        .then((ok) => { if (ok) download(dataApi.harURL(exportParams(st.get()), true), 'formnet-with-secrets.har'); });
     } },
+    { id: 'session-open', label: 'Open Session...', keys: ['Mod+O'], run: () => openSession(st) },
+    { id: 'session-save', label: 'Save Session...', keys: ['Shift+Mod+S'], run: () => saveSession() },
+    { id: 'session-export', label: 'Export Session...', run: () => {
+      void confirmAction(t('Export Session'), t('A session file holds every flow as it was captured, with its bodies and WebSocket messages, and the passwords, tokens and cookies the requests carried. Keep it private and share it only with someone you would give those to.'), t('Export Session'), false, t('Cancel'))
+        .then((ok) => { if (ok) download(dataApi.sessionExportURL(exportParams(st.get())), 'formnet-session.formnet'); });
+    } },
+    { id: 'session-close', label: 'Close Session', enabled: () => !!dataOf(st.get().status).session?.open, run: () => closeSession(st) },
+    { id: 'import-har', label: 'Import HAR...', run: () => importHar(st) },
+    { id: 'copy-all-curl', label: 'Copy All as cURL...', run: () => copyAllAsCurl(st) },
     { id: 'download-ca', label: 'Download Root Certificate...', run: () => download(api.caURL(), 'formnet-ca.pem') },
     { id: 'clear-recording', label: 'Clear Recording', keys: ['Mod+K'], enabled: () => st.get().flows.size > 0, run: () => {
       if (!loadPrefs().confirmClear) { clear(); return; }

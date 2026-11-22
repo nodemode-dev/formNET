@@ -1,3 +1,4 @@
+import { flowFilters, flowQuery, parseTyped } from "./filters.ts";
 import type { Flow, FlowEvent, HostSummary, Snapshot, Status } from "./types.ts";
 import type { MachineSort } from "./ui/prefs";
 
@@ -22,6 +23,7 @@ export interface State {
   machine: Snapshot | null;
   status: Status | null;
   notice: string;
+  filterEpoch: number; // bumped when the Flows filters, or the server's answer to them, change what is shown
 }
 
 export const initialState: State = {
@@ -43,6 +45,7 @@ export const initialState: State = {
   machine: null,
   status: null,
   notice: "",
+  filterEpoch: 0,
 };
 
 type Listener = (state: State, previous: State) => void;
@@ -136,12 +139,15 @@ function trim(map: Map<string, Flow>, limit: number): Map<string, Flow> {
 
 // visibleFlows filters client-side so typing never waits on the server.
 export function visibleFlows(state: State): Flow[] {
-  const q = state.filter.trim().toLowerCase();
+  const q = parseTyped(state.filter).rest.toLowerCase();
   const host = state.hostFilter.toLowerCase();
+  const body = flowFilters.get().body;
+  const query = flowQuery();
   const out: Flow[] = [];
   for (const f of state.flows.values()) {
     if (host && f.host.toLowerCase() !== host) continue;
-    if (q && !matches(f, q)) continue;
+    if (q && !body && !matches(f, q)) continue;
+    if (query ? !query.shows(f, state) : !flowFilters.matches(f, undefined, state.filter)) continue;
     out.push(f);
   }
   return out;

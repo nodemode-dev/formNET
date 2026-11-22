@@ -3,7 +3,7 @@ import { PREF_PAGES } from './settings-dialog';
 
 /** The menus, one list for the in-window bar and the macOS menu bar (native-menu.ts builds from the same ids). */
 export const menus = (): MenuDef[] => [
-  { label: 'File', items: ['export-har', 'export-har-secrets', 'download-ca', '-', 'clear-recording'] },
+  { label: 'File', items: ['session-open', 'session-save', 'session-export', 'session-close', '-', 'import-har', 'export-har', 'export-har-secrets', 'copy-all-curl', '-', 'download-ca', '-', 'clear-recording'] },
   { label: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'select-all', '-', 'find', '-', { label: 'Preferences', items: ['settings', '-', ...PREF_PAGES.map(([id]) => `prefs-${id}`)] }] },
   { label: 'View', items: ['view-flows', 'view-hosts', 'view-machine', 'view-setup', '-', 'home', '-', 'live', '-', 'terminal', 'terminal-new', '-', 'zoom-in', 'zoom-out', 'zoom-reset', '-', 'theme-toggle', '-', 'menus-in-window', 'custom-title-bar'] },
   { label: 'Tools', items: ['rules-toggle', '-', 'tool-rewrite', 'tool-map-local', 'tool-map-remote', 'tool-block', '-', 'breakpoints-show', 'tool-breakpoint-rules', '-', 'prefs-throttle', 'prefs-devices'] },
