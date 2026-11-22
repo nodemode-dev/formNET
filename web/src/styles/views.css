@@ -142,6 +142,30 @@ img.preview { max-width: 100%; border: 1px solid var(--line-1); border-radius: v
 .view-flows { overflow-anchor: none; }
 .view-flows > .flows-held { position: sticky; bottom: var(--space-2); display: block; line-height: 26px; text-align: center; width: 340px; max-width: calc(100% - 2 * var(--space-3)); height: 28px; margin: var(--space-2) auto 0; padding: 0 var(--space-3); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: var(--shadow-md); font-size: var(--fs-12); }
 
+/* ── resend: the marker on a resent row, the detail's resend row (kept in place for every kind, shown for http), and
+   the pane kept dimmed while the next selection loads instead of emptied ── */
+.resent-mark { display: inline-flex; margin-inline-end: 4px; vertical-align: -2px; color: var(--accent-color); }
+.detail-resend.is-off { visibility: hidden; }
+.detail-body.is-stale { opacity: 0.6; pointer-events: none; }
+.detail .kv dd .linkish { font: inherit; text-align: start; overflow-wrap: anywhere; }
+.detail .kv dd .label { margin-inline-start: 6px; }
+[dir="rtl"] .detail-resend .cv-btn .icon { scale: -1 1; }
+
+/* ── Setup: the system proxy block's text keeps two lines (the full text is its title); the recipes keep one size
+   whichever shell and program are chosen, the lines and the note scrolling inside their boxes ── */
+.cv-setup-text.cv-setup-clamp { display: -webkit-box; height: 3em; min-height: 0; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cv-setup-recipes { display: grid; gap: 8px; margin-top: 10px; }
+.cv-setup-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.cv-setup-block .cv-seg { display: inline-flex; flex: none; }
+.cv-setup-block .cv-seg button { padding: 0 12px; font: inherit; font-size: 12px; white-space: nowrap; }
+.cv-setup-block .cv-seg button:hover:not(.is-on):not(:disabled) { color: var(--text-primary); }
+.cv-setup-block .cv-seg button:disabled { opacity: 0.45; cursor: default; }
+.cv-setup-recipe { overflow: hidden; border: 1px solid var(--line-1); border-radius: 8px; background: var(--surface-1); }
+.cv-setup-recipe-head { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 8px; height: 40px; padding-inline: 12px 4px; border-bottom: 1px solid var(--line-1); }
+.cv-setup-recipe-title { overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cv-setup-lines { height: 144px; box-sizing: border-box; margin: 0; padding: 10px 12px; overflow: auto; color: var(--text-primary); line-height: 18px; white-space: pre; }
+.cv-setup-note { height: calc(5 * 18px); margin: 0; padding: 8px 12px; overflow: auto; border-top: 1px solid var(--line-1); color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+
 /* ── right to left: data (paths, URLs, addresses, header names and values, times, sizes) reads left to right inside
    the page, and a cell of it still lines up with the page's start ── */
 [dir="rtl"] :is(.mono, code, pre, kbd, .cv-host-name, .cv-proc-name, .domain, .detail-title, .flows td.host, .flows td.proc) { direction: ltr; unicode-bidi: isolate; }

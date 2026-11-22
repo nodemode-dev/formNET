@@ -5,9 +5,20 @@ import { visibleFlows } from "../state.ts";
 import type { Flow } from "../types.ts";
 import { setText, setTitle } from "./dom";
 import { language, onLanguage, t, tn } from "./i18n";
+import { icon } from "./icons";
 
 const columns = ["Time", "Process", "Method", "Host", "Path", "Status", "Type", "Sent", "Received", "Duration"];
 const HOLD_CAP = 2000;
+
+// The flows the store holds now, so a resent row can name when its original started.
+let known: ReadonlyMap<string, Flow> = new Map();
+
+/** The tooltip of a resent row's marker, a whole sentence in the current language. */
+export function resentText(f: Flow, flows: ReadonlyMap<string, Flow> = known): string {
+  const orig = f.resent_from ? flows.get(f.resent_from) : undefined;
+  if (!orig) return t(f.edited ? "Resent from a flow no longer kept, edited" : "Resent from a flow no longer kept");
+  return t(f.edited ? "Resent from {time}, edited" : "Resent from {time}").replace("{time}", clock(orig.start));
+}
 
 interface Drawn {
   flow: Flow;
@@ -148,6 +159,7 @@ export function flowsView(store: Store): HTMLElement {
   });
 
   const render = (s: State, prev: State) => {
+    known = s.flows;
     root.hidden = s.view !== "flows";
     if (root.hidden) return;
     const listChanged = s.flows !== prev.flows || s.filter !== prev.filter || s.hostFilter !== prev.hostFilter || s.live !== prev.live || s.view !== prev.view || s.maxRows !== prev.maxRows;
@@ -221,10 +233,19 @@ function relabel(tr: HTMLTableRowElement, f: Flow): void {
   setText(c[0] ?? null, clock(f.start));
   const kind = c[4]?.querySelector(".kind");
   if (kind) setText(kind, t(kindLabel(f.kind)));
+  const mark = c[4]?.querySelector<HTMLElement>(".resent-mark");
+  if (mark) { setTitle(mark, resentText(f)); mark.setAttribute("aria-label", mark.title); }
   if (f.error) setText(c[5] ?? null, t("error"));
   setText(c[7] ?? null, bytes(f.bytes_sent));
   setText(c[8] ?? null, bytes(f.bytes_received));
   setText(c[9] ?? null, f.pending ? "" : millis(f.duration_ms));
+}
+
+function resentMark(f: Flow): HTMLElement {
+  const text = resentText(f);
+  const mark = h("span", { class: "resent-mark", role: "img", title: text, "aria-label": text });
+  mark.innerHTML = icon("redo", 12);
+  return mark;
 }
 
 function buildRow(f: Flow, select: (id: string) => void): HTMLTableRowElement {
@@ -237,7 +258,7 @@ function buildRow(f: Flow, select: (id: string) => void): HTMLTableRowElement {
     h("td", { class: "proc", title: f.client_pid ? t("pid {pid}, {client}").replace("{pid}", String(f.client_pid)).replace("{client}", f.client) : f.client }, f.client_process ?? ""),
     h("td", { class: `mono ${methodClass(f.method)}` }, f.method),
     h("td", { class: "host" }, f.host, f.port && f.port !== 443 && f.port !== 80 ? h("span", { class: "dim" }, `:${f.port}`) : null),
-    h("td", { class: "path mono", title: f.url }, kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
+    h("td", { class: "path mono", title: f.url }, f.resent_from ? resentMark(f) : null, kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
     h("td", { class: `status mono ${statusClass(f.status, f.error)}`, title: f.error ?? "" }, status),
     h("td", { class: "type" }, shortType(f.response?.content_type)),
     h("td", { class: "num mono" }, bytes(f.bytes_sent)),

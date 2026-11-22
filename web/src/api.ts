@@ -1,5 +1,5 @@
 import { authHeaders, withToken } from "./session.ts";
-import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, InterceptMode, ProxyStatus, Snapshot, Status } from "./types.ts";
+import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, InterceptMode, ProxyStatus, Recipes, ResendEdit, Snapshot, Status, SysProxyStatus } from "./types.ts";
 
 const base = location.origin;
 
@@ -48,6 +48,29 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+// HTTPError carries the server's status beside its plain message, for callers that answer some statuses differently.
+export class HTTPError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "HTTPError";
+  }
+}
+
+async function postStatus<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(base + path, {
+    method: "POST",
+    credentials: "omit",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) check(res, path);
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new HTTPError(res.status, detail.error ?? `${path}: ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
 // FlowFilter holds only what the server's list route understands.
 export interface FlowFilter {
   q?: string;
@@ -80,6 +103,10 @@ export const api = {
   proxy: () => getJSON<ProxyStatus>("/api/proxy"),
   updateProxy: (u: { intercept?: InterceptMode; passthrough?: string[] }) => postJSON<ProxyStatus>("/api/proxy", u),
   ca: () => getJSON<CAInfo>("/api/ca"),
+  sysproxy: () => getJSON<SysProxyStatus>("/api/sysproxy"),
+  setSysproxy: (enabled: boolean) => postJSON<SysProxyStatus>("/api/sysproxy", { enabled }),
+  recipes: () => getJSON<Recipes>("/api/recipes"),
+  resend: (id: string, edit: ResendEdit = {}) => postStatus<{ id: string }>(`/api/flows/${encodeURIComponent(id)}/resend`, edit),
   harURL: (f: FlowFilter, secrets = false) => {
     const q = filterQuery(f);
     return withToken(`${base}/api/export/har${q}${secrets ? `${q ? "&" : "?"}secrets=1` : ""}`);
