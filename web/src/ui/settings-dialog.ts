@@ -7,6 +7,7 @@ import { checkRow, labelText, selectRow, sliderRow, tf } from './panels/controls
 import { AgentsSection } from './panels/agents';
 import { HttpsSection, PassthroughSection, ProxySection, RootSection } from './panels/capture';
 import { StorageSection } from './panels/storage';
+import { SystemProxySection } from './panels/system-proxy';
 import { MACHINE_SORTS, PREFIX, UI_FONT_SIZES, UI_SCALES, loadPrefs, savePrefs, setUiScale, uiScaleChoice, type MachineSort, type Prefs, type UiFontSize } from './prefs';
 import { STORAGE_KEY, THEMES, readChoice, setAccent, setIntensity, setTheme, themeSwatchesHtml } from './themes';
 
@@ -64,6 +65,7 @@ export class SettingsDialog extends Dialog {
   private readonly root: RootSection;
   private readonly passthrough: PassthroughSection;
   private readonly proxy: ProxySection;
+  private readonly sysproxy: SystemProxySection;
   private readonly agents = new AgentsSection();
 
   constructor(private readonly deps: SettingsDeps) {
@@ -72,6 +74,7 @@ export class SettingsDialog extends Dialog {
     this.root = new RootSection(deps.store);
     this.passthrough = new PassthroughSection(deps.store);
     this.proxy = new ProxySection(deps.store);
+    this.sysproxy = new SystemProxySection(deps.store);
     const swatches = document.createElement('template');
     swatches.innerHTML = themeSwatchesHtml();
     this.grid.append(swatches.content);
@@ -130,6 +133,7 @@ export class SettingsDialog extends Dialog {
       grp('Language, Text and Scale', this.languageRow.el, nt('The language of the whole interface. Host names, paths, headers and bodies stay as the programs sent them.'), cols(this.fontSizeRow.el, this.scaleRow.el), nt('Text size scales the interface\'s text; scale zooms the whole window.')),
       grp('Motion and Notices', this.animationsRow.el, this.noticeSecondsRow.el, this.tooltipsRow.el));
     add('Capture',
+      grp('System Proxy', this.sysproxy.el),
       grp('HTTPS', this.https.el),
       grp('Root Certificate', this.root.el),
       grp('Passthrough', this.passthrough.el),
@@ -233,6 +237,7 @@ export class SettingsDialog extends Dialog {
     this.root.refresh(status);
     this.passthrough.refresh(status);
     this.proxy.refresh(status);
+    this.sysproxy.refresh(status);
     this.agents.refresh(status);
   }
 

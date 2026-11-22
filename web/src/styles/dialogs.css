@@ -171,3 +171,28 @@
 .cv-prefs-dlg textarea.cv-input { width: 100%; height: auto; min-height: 84px; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font: 12px/1.5 var(--font-mono); resize: vertical; box-sizing: border-box; }
 .cv-prefs-dlg textarea.cv-input:focus { outline: none; border-color: var(--accent-color); }
 .cv-prefs-dlg .cv-note code { padding: 0 4px; border-radius: var(--radius-xs); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: 11px; }
+
+/* Preferences > Capture > System Proxy: the state keeps three lines whatever it says (the full text is its title); the
+   services list appears with the status and changes only when the system's services do. */
+.cv-sysproxy-state { display: -webkit-box; height: calc(3 * 1.45em); margin: 0; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.cv-sysproxy-state.is-error { color: var(--danger-soft); }
+.cv-sysproxy-head { margin: 0; }
+.cv-sysproxy-services { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 11.5px; }
+.cv-sysproxy-services li { display: grid; grid-template-columns: minmax(0, 38%) minmax(0, 1fr); gap: 8px; height: 20px; align-items: center; }
+.cv-sysproxy-services span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-sysproxy-name { color: var(--text-primary); }
+.cv-sysproxy-addr { color: var(--text-muted); font-family: var(--font-mono); direction: ltr; unicode-bidi: isolate; }
+
+/* Edit and resend: the header list and the body keep fixed heights and scroll, the notes and the error keep their
+   lines, so adding a header, typing or an answer from the server never changes the dialog's size. */
+.cv-resend-dlg { width: min(680px, calc(100vw - 48px)); }
+.cv-resend-dlg .cv-field { grid-template-columns: 72px minmax(0, 1fr); }
+.cv-resend-dlg .cv-note-head { margin: 0; padding-top: 0; }
+.cv-resend-headers { display: grid; align-content: start; gap: 4px; height: 196px; padding: 4px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-primary); scrollbar-gutter: stable; }
+.cv-resend-row { display: grid; grid-template-columns: minmax(0, 36%) minmax(0, 1fr) var(--ctl-md); gap: 4px; align-items: center; }
+.cv-resend-row .cv-input, .cv-resend-dlg .cv-field .cv-input { width: 100%; box-sizing: border-box; font-family: var(--font-mono); }
+.cv-resend-dlg .cv-improve { margin: 0; }
+.cv-resend-dlg .cv-improve .cv-btn { gap: 6px; }
+.cv-resend-bodynote { height: calc(2 * 1.45em); margin: 0; overflow: hidden; line-height: 1.45; }
+.cv-resend-body { width: 100%; height: 156px; box-sizing: border-box; padding: 6px 8px; resize: none; font-family: var(--font-mono); line-height: 1.45; white-space: pre; overflow: auto; }
+.cv-resend-error { height: calc(2 * 1.45em); margin: 0; overflow: auto; color: var(--danger-soft); font-size: var(--fs-12); line-height: 1.45; }
