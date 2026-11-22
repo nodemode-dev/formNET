@@ -7,12 +7,25 @@ import { LANG_NAMES, LANG_PARENT, RTL_LANGS, isLang as isLangCode, type Lang } f
 export type { Lang } from './i18n/langs';
 
 type Table = Record<string, string>;
-/** The tables are loaded lazily, one module per language, as formvis ships them. formNET ships none yet: every
- *  loader is left out, the picker lists English alone, and the plumbing (t, onLanguage, the page translator) is in
- *  place for the day the tables are ported. Add a language here and in LANG_NAMES at the same time. */
-const LOADERS: Partial<Record<Exclude<Lang, 'en'>, () => Promise<Table>>> = {};
-const MORE: Partial<Record<Exclude<Lang, 'en'>, () => Promise<Table>>> = {};
-const EXTRA: Partial<Record<Exclude<Lang, 'en'>, () => Promise<Table>>> = {};
+/** One table per language, loaded lazily as formvis loads its first part; FormNET's few hundred strings need no
+ *  second or third part. A regional variant holds only what it says differently from its parent. */
+const LOADERS: Record<Exclude<Lang, 'en'>, () => Promise<Table>> = {
+  es: () => import('./i18n/es').then((m) => m.es), 'es-MX': () => import('./i18n/es-MX').then((m) => m.esMX),
+  'pt-BR': () => import('./i18n/pt-BR').then((m) => m.ptBR), fr: () => import('./i18n/fr').then((m) => m.fr),
+  'fr-CA': () => import('./i18n/fr-CA').then((m) => m.frCA), de: () => import('./i18n/de').then((m) => m.de),
+  it: () => import('./i18n/it').then((m) => m.it), nl: () => import('./i18n/nl').then((m) => m.nl),
+  da: () => import('./i18n/da').then((m) => m.da), fi: () => import('./i18n/fi').then((m) => m.fi),
+  nb: () => import('./i18n/nb').then((m) => m.nb), sv: () => import('./i18n/sv').then((m) => m.sv),
+  ru: () => import('./i18n/ru').then((m) => m.ru), pl: () => import('./i18n/pl').then((m) => m.pl),
+  cs: () => import('./i18n/cs').then((m) => m.cs), hu: () => import('./i18n/hu').then((m) => m.hu),
+  uk: () => import('./i18n/uk').then((m) => m.uk), tr: () => import('./i18n/tr').then((m) => m.tr),
+  'zh-CN': () => import('./i18n/zh-CN').then((m) => m.zhCN), 'zh-TW': () => import('./i18n/zh-TW').then((m) => m.zhTW),
+  ja: () => import('./i18n/ja').then((m) => m.ja), ko: () => import('./i18n/ko').then((m) => m.ko),
+  id: () => import('./i18n/id').then((m) => m.id), th: () => import('./i18n/th').then((m) => m.th),
+  vi: () => import('./i18n/vi').then((m) => m.vi), ar: () => import('./i18n/ar').then((m) => m.ar), hi: () => import('./i18n/hi').then((m) => m.hi),
+  el: () => import('./i18n/el').then((m) => m.el),
+  'sr-Latn': () => import('./i18n/sr-Latn').then((m) => m.srLatn),
+};
 const tables = new Map<Lang, Table>([['en', {}]]);
 
 const saved = loadPrefs().language;
@@ -21,7 +34,7 @@ let wanted: Lang = saved;
 const listeners = new Set<() => void>();
 
 /** The language codes with their own names, for a picker. */
-export const languages = (): ReadonlyArray<readonly [Lang, string]> => LANG_NAMES.filter(([code]) => code === 'en' || code in LOADERS);
+export const languages = (): ReadonlyArray<readonly [Lang, string]> => LANG_NAMES;
 
 export const language = (): Lang => current;
 
@@ -32,10 +45,7 @@ export const isLang = isLangCode;
 async function load(l: Lang): Promise<void> {
   for (const code of [LANG_PARENT[l], l]) {
     if (!code || tables.has(code) || code === 'en') continue;
-    const loader = LOADERS[code], more = MORE[code], extra = EXTRA[code];
-    if (!loader) continue;
-    const [a, b, c] = await Promise.all([loader(), more ? more() : Promise.resolve({}), extra ? extra() : Promise.resolve({})]);
-    tables.set(code, { ...c, ...b, ...a });   // the first part wins where parts share a key
+    tables.set(code, await LOADERS[code]());
   }
 }
 
@@ -78,11 +88,14 @@ export async function setLanguage(l: Lang): Promise<void> {
   wanted = l;
   try { await load(l); } catch { return; }   // a table that cannot load leaves the language as it was
   if (wanted !== l || l === current) return;
+  const was = current;
   current = l;
   document.documentElement.lang = l;
   document.documentElement.dir = RTL_LANGS.has(l) ? 'rtl' : 'ltr';
   for (const fn of listeners) fn();
+  prior = reverse(was);
   translatePage();
+  prior = null;
 }
 
 /** At start, before the interface is built: the saved language's table loaded and made current (English on failure). */
@@ -105,13 +118,51 @@ export function onLanguage(fn: () => void): () => void {
  * once, tooltips) is translated where it lands, by exact match on the English. Each touched text node or attribute keeps
  * its English, so a later language change, or English again, puts the right text back. It runs from a MutationObserver,
  * whose callbacks run before the browser paints, so English is never shown first. Text the person owns is never
- * touched: inputs, text areas, editable text, the canvas, and anything inside [data-no-i18n] (layer, document, channel,
- * path and preset names). */
+ * touched: inputs, text areas, editable text, the canvas, and anything inside [data-no-i18n] or translate="no". Nor is
+ * what the network or the machine supplies: code, monospaced values (header names and values, URLs, bodies, addresses,
+ * paths), host and process names, and the data cells of the flow, host, process and connection tables. */
 const ATTRS = ['title', 'aria-label', 'placeholder'] as const;
-const SKIP = 'textarea, input, script, style, canvas, [contenteditable], [data-no-i18n], .cv-type-editor, .cv-tab-name, .cv-home-name, .cv-host-name, .cv-proc-name, .flows td, .hosts td, .procs-table td, .conns td, .detail-body';
+const SKIP = 'textarea, input, script, style, canvas, code, pre, kbd, [contenteditable], [data-no-i18n], [translate="no"], .mono, .cv-type-editor, .cv-home-name, .cv-host-name, .cv-proc-name, .domain, .detail-title, .flows td, .hosts td, .procs-table .proc-row td, .conns td';
 const textEn = new WeakMap<Text, { en: string; shown: string }>();
 const attrEn = new WeakMap<Element, Map<string, { en: string; shown: string }>>();
 let observer: MutationObserver | null = null;
+
+/** During a language change only: the language left behind, each of its translations mapped back to its English, so
+ *  text that code set through t() before the change, which the translator never saw in English, is re-labelled too. */
+let prior: Map<string, string[]> | null = null;
+
+function reverse(l: Lang): Map<string, string[]> | null {
+  if (l === 'en') return null;
+  const parent = LANG_PARENT[l], m = new Map<string, string[]>();
+  for (const [en, shown] of Object.entries({ ...(parent ? tables.get(parent) : undefined), ...tables.get(l) })) m.set(shown, [...(m.get(shown) ?? []), en]);
+  return m;
+}
+
+/** The English behind `shown` in the language left behind. Where two English strings share that translation, only when
+ *  the current language words them alike too; otherwise the text is left as it is. */
+function priorEnglish(shown: string): string | undefined {
+  const all = prior?.get(shown);
+  if (!all) return undefined;
+  const first = t(all[0]);
+  return all.every((en) => t(en) === first) ? all[0] : undefined;
+}
+
+/** The English behind `text`: the data-en its owner keeps (labelText, dialog buttons) while the text is still what the
+ *  owner set; the text itself when the current language has an entry for it; else what the language left behind
+ *  translated it from. Undefined when none of these knows it. */
+function englishOf(text: string, owner: HTMLElement | null): string | undefined {
+  if (owner && owner.dataset.en !== undefined && owner.childNodes.length === 1 && (owner.dataset.shown ?? '').trim() === text) return owner.dataset.en;
+  if (known(text)) return text;
+  if (!prior) return undefined;
+  if (prior.has(text)) return priorEnglish(text);
+  const tail = text.endsWith('...') ? '...' : text.endsWith(':') ? ':' : '';
+  const base = tail ? priorEnglish(text.slice(0, -tail.length)) : undefined;
+  return base === undefined ? undefined : `${base}${tail}`;
+}
+
+/** Keeps an owner's data-shown in step with text the translator changed, so the owner's own relabel pass still sees
+ *  its label as untouched. */
+const syncShown = (owner: HTMLElement | null): void => { if (owner && owner.dataset.en !== undefined) owner.dataset.shown = owner.textContent ?? ''; };
 
 const skipped = (n: Node | null): boolean => {
   const e = n instanceof Element ? n : n?.parentElement ?? null;
@@ -122,15 +173,18 @@ function translateText(node: Text): void {
   const raw = node.data, rec = textEn.get(node);
   if (rec && raw === rec.shown) {   // ours: shown in an earlier language, the English kept
     const next = t(rec.en);
-    if (next !== raw) { rec.shown = next; node.data = next; }
+    if (next !== raw) { rec.shown = next; node.data = next; syncShown(node.parentElement); }
     if (current === 'en' || next === rec.en) textEn.delete(node);
     return;
   }
   const trimmed = raw.trim();
-  if (!trimmed || trimmed.length > 200 || !known(trimmed) || skipped(node)) { if (rec) textEn.delete(node); return; }
-  const next = raw.replace(trimmed, t(trimmed));
-  textEn.set(node, { en: raw, shown: next });
-  node.data = next;
+  if (!trimmed || trimmed.length > 200 || skipped(node)) { if (rec) textEn.delete(node); return; }
+  const owner = node.parentElement, en = englishOf(trimmed, owner);
+  const shown = en === undefined ? trimmed : t(en);
+  if (en === undefined || (en === trimmed && shown === trimmed)) { if (rec) textEn.delete(node); return; }
+  const next = raw.replace(trimmed, () => shown);
+  textEn.set(node, { en: raw.replace(trimmed, () => en), shown: next });
+  if (next !== raw) { node.data = next; syncShown(owner); }
 }
 
 function translateAttrs(el: Element): void {
@@ -144,11 +198,12 @@ function translateAttrs(el: Element): void {
       if (next !== v) { rec.shown = next; el.setAttribute(a, next); }
       continue;
     }
-    if (!known(v) || skippedAttr(el)) { recs?.delete(a); continue; }
+    const en = englishOf(v, null);
+    const next = en === undefined ? v : t(en);
+    if (en === undefined || (en === v && next === v) || skippedAttr(el)) { recs?.delete(a); continue; }
     if (!recs) { recs = new Map(); attrEn.set(el, recs); }
-    const next = t(v);
-    recs.set(a, { en: v, shown: next });
-    el.setAttribute(a, next);
+    recs.set(a, { en, shown: next });
+    if (next !== v) el.setAttribute(a, next);
   }
 }
 
