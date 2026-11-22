@@ -1,31 +1,42 @@
 //! The splash stays up until the window has drawn its first real content and at least SPLASH_MIN has passed since
 //! launch (the family's 2.6 s, from formvis 1.96.0); then its bar completes and the window appears whole, in one step. Until then
 //! the main window exists but cannot be seen: on macOS it is on screen at alpha 0 and lets clicks through, since a
-//! hidden window's web view stops its animation frames and the page renders through them; elsewhere it is created
-//! hidden. Both windows carry the page's dark background, so no white frame shows at any point.
+//! hidden window's web view stops its animation frames and the page renders through them; on Linux and the BSDs it is
+//! on screen at opacity 0; on Windows it is built visible in the theme's surface colour. Both windows carry a dark
+//! background, so no white frame shows at any point.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use tauri::{Manager, Runtime, WebviewWindow};
 
 pub const SPLASH_MIN: Duration = Duration::from_millis(2600);
-pub const BACKGROUND: tauri::window::Color = tauri::window::Color(10, 10, 10, 255);
+pub const BACKGROUND: tauri::window::Color = tauri::window::Color(17, 17, 17, 255);
 const BAR_FINISH: Duration = Duration::from_millis(220);
 const FALLBACK: Duration = Duration::from_secs(20);
 
 static LAUNCH: OnceLock<Instant> = OnceLock::new();
 static REVEALED: AtomicBool = AtomicBool::new(false);
+static SPLASH_PARTS: AtomicU8 = AtomicU8::new(0);
 
 /// Called first thing in main, so the splash's minimum counts from launch.
 pub fn mark_launch() {
     let _ = LAUNCH.set(Instant::now());
 }
 
-/// Whether the main window is built visible: elsewhere yes, as before; on macOS it is built hidden and `conceal` puts it
-/// on screen at alpha 0, in that order on the main thread, so no opaque frame can show first.
-pub const BUILD_VISIBLE: bool = !cfg!(target_os = "macos");
+pub fn revealed() -> bool {
+    REVEALED.load(Ordering::SeqCst)
+}
+
+pub const BUILD_VISIBLE: bool = !cfg!(any(
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+));
 
 /// Right after the main window is built: puts it on screen unseen (macOS), and shows it anyway after FALLBACK if the
 /// page never says it is ready (a page that failed to load must not leave the person with only the splash).
@@ -41,9 +52,11 @@ pub fn conceal<R: Runtime>(window: &WebviewWindow<R>) {
     });
 }
 
-/// The page's first content is painted (dom.ts revealApp).
 #[tauri::command(async)]
-pub fn app_ready<R: Runtime>(app: tauri::AppHandle<R>) {
+pub fn app_ready<R: Runtime>(app: tauri::AppHandle<R>, bg: Option<[u8; 3]>) {
+    if let (Some([r, g, b]), Some(main)) = (bg, app.get_webview_window("main")) {
+        let _ = main.set_background_color(Some(tauri::window::Color(r, g, b, 255)));
+    }
     show_main(&app);
 }
 
@@ -82,8 +95,32 @@ fn set_seen<R: Runtime>(window: &WebviewWindow<R>, seen: bool) {
     });
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+fn set_seen<R: Runtime>(window: &WebviewWindow<R>, seen: bool) {
+    let target = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        use gtk::prelude::WidgetExt;
+        if let Ok(gtk_window) = target.gtk_window() {
+            gtk_window.realize();
+            gtk_window.set_opacity(if seen { 1.0 } else { 0.0 });
+        }
+    });
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd")))]
 fn set_seen<R: Runtime>(_window: &WebviewWindow<R>, _seen: bool) {}
+
+pub fn hold_splash() {
+    SPLASH_PARTS.store(2, Ordering::SeqCst);
+}
+
+pub fn splash_part<R: Runtime>(app: &tauri::AppHandle<R>) {
+    if SPLASH_PARTS.fetch_add(1, Ordering::SeqCst) == 1 && !revealed() {
+        if let Some(splash) = app.get_webview_window("splash") {
+            let _ = splash.show();
+        }
+    }
+}
 
 /// The splash card's corners (formvis 1.96.1): the page draws a rounded card, but on macOS the window and the web view still
 /// painted a square behind it. The window is made non-opaque with a clear background, and its content layer is masked
@@ -109,13 +146,10 @@ pub fn round_splash<R: Runtime>(app: &tauri::AppHandle<R>) {
         }
         window.invalidateShadow();
     });
-    let _ = splash.show();
+    splash_part(app);
 }
 
-/// Elsewhere the splash, built hidden like on macOS, is shown as it is.
 #[cfg(not(target_os = "macos"))]
 pub fn round_splash<R: Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(splash) = app.get_webview_window("splash") {
-        let _ = splash.show();
-    }
+    splash_part(app);
 }
