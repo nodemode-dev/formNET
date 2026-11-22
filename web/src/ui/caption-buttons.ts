@@ -1,4 +1,5 @@
 import { q, setClass, setHidden, setTitle } from './dom';
+import { t } from './i18n';
 import { icon } from './icons';
 
 /** Windows and Linux in the desktop app can draw their own title bar: the system's frame is taken off and the title bar
@@ -25,9 +26,9 @@ export class CaptionButtons {
     this.box.className = 'cv-caption';
     this.box.hidden = true;
     this.box.innerHTML =
-      `<button class="cv-caption-btn" type="button" data-cap="min" title="Minimize" aria-label="Minimize">${icon('capMin', 16)}</button>` +
-      `<button class="cv-caption-btn" type="button" data-cap="max" title="Maximize" aria-label="Maximize">${icon('capMax', 16)}</button>` +
-      `<button class="cv-caption-btn is-close" type="button" data-cap="close" title="Close" aria-label="Close">${icon('close', 16)}</button>`;
+      `<button class="cv-caption-btn" type="button" data-cap="min" title="${t('Minimize')}" aria-label="${t('Minimize')}">${icon('capMin', 16)}</button>` +
+      `<button class="cv-caption-btn" type="button" data-cap="max" title="${t('Maximize')}" aria-label="${t('Maximize')}">${icon('capMax', 16)}</button>` +
+      `<button class="cv-caption-btn is-close" type="button" data-cap="close" title="${t('Close')}" aria-label="${t('Close')}">${icon('close', 16)}</button>`;
     header.append(this.box);
     if (wantsOverlayTitleBar()) {
       document.documentElement.classList.add('has-overlay-titlebar');
@@ -81,7 +82,7 @@ export class CaptionButtons {
     this.box.dataset.shown = '1';
     const b = q<HTMLElement>(this.box, '[data-cap="max"]');
     b.innerHTML = icon(now ? 'capRestore' : 'capMax', 16);
-    setTitle(b, now ? 'Restore' : 'Maximize');
-    b.setAttribute('aria-label', now ? 'Restore' : 'Maximize');
+    setTitle(b, t(now ? 'Restore' : 'Maximize'));
+    b.setAttribute('aria-label', t(now ? 'Restore' : 'Maximize'));
   }
 }

@@ -3,9 +3,9 @@ import { Dialog, confirmAction } from './dialogs';
 import { el, q, setClass, setHidden, setText, setValue } from './dom';
 import { icon } from './icons';
 import { languages, onLanguage, setLanguage, t, type Lang } from './i18n';
-import { checkRow, selectRow, sliderRow } from './panels/controls';
+import { checkRow, labelText, selectRow, sliderRow, tf } from './panels/controls';
 import { AgentsSection } from './panels/agents';
-import { HttpsSection, PassthroughSection, ProxySection } from './panels/capture';
+import { HttpsSection, PassthroughSection, ProxySection, RootSection } from './panels/capture';
 import { StorageSection } from './panels/storage';
 import { MACHINE_SORTS, PREFIX, UI_FONT_SIZES, UI_SCALES, loadPrefs, savePrefs, setUiScale, uiScaleChoice, type MachineSort, type Prefs, type UiFontSize } from './prefs';
 import { STORAGE_KEY, THEMES, readChoice, setAccent, setIntensity, setTheme, themeSwatchesHtml } from './themes';
@@ -45,7 +45,7 @@ export class SettingsDialog extends Dialog {
   private prefs: Prefs = loadPrefs();
   private readonly homeRow = checkRow('Show Home screen at launch', (v) => this.change({ autoShowHome: v }));
   private readonly homeClearRow = checkRow('Show Home screen when the recording is cleared', (v) => this.change({ homeOnClear: v }));
-  private readonly liveRow = checkRow('New flows keep the table following when formNET starts', (v) => this.change({ liveFollows: v }));
+  private readonly liveRow = checkRow('New flows keep the table following when FormNET starts', (v) => this.change({ liveFollows: v }));
   private readonly rowsRow = sliderRow('Rows drawn in the Flows table', 100, 5000, 100, (v) => this.change({ maxRows: v }), { def: 500 });
   private readonly confirmClearRow = checkRow('Ask before Clear Recording', (v) => this.change({ confirmClear: v }));
   private readonly intensityRow = sliderRow('Accent intensity (%)', 0, 150, 5, (v) => setIntensity(v / 100), { def: 100 });
@@ -61,6 +61,7 @@ export class SettingsDialog extends Dialog {
   private readonly machineSortRow = selectRow('Process list order', MACHINE_SORTS, (v) => this.change({ machineSort: v as MachineSort }));
   private readonly storage = new StorageSection();
   private readonly https: HttpsSection;
+  private readonly root: RootSection;
   private readonly passthrough: PassthroughSection;
   private readonly proxy: ProxySection;
   private readonly agents = new AgentsSection();
@@ -68,6 +69,7 @@ export class SettingsDialog extends Dialog {
   constructor(private readonly deps: SettingsDeps) {
     super('Preferences', 620);
     this.https = new HttpsSection(deps.store);
+    this.root = new RootSection(deps.store);
     this.passthrough = new PassthroughSection(deps.store);
     this.proxy = new ProxySection(deps.store);
     const swatches = document.createElement('template');
@@ -84,7 +86,7 @@ export class SettingsDialog extends Dialog {
       g.append(...content);
       return g;
     };
-    const nt = (text: string): HTMLElement => el(`<p class="cv-note">${text}</p>`);
+    const nt = (text: string): HTMLElement => { const p = el('<p class="cv-note"></p>'); setText(p, t(text)); onLanguage(() => setText(p, t(text))); return p; };
     const cols = (...content: HTMLElement[]): HTMLElement => { const c = el('<div class="cv-prefs-cols"></div>'); c.append(...content); return c; };
     const add = (name: string, ...content: HTMLElement[]): void => {
       const tab = el<HTMLButtonElement>(`<button class="cv-prefs-railtab" type="button" role="tab"><span class="cv-prefs-tabicon">${icon(RAIL_ICONS[name] ?? 'pfGeneral', 18)}</span><span class="cv-prefs-tablabel"></span></button>`);
@@ -106,27 +108,30 @@ export class SettingsDialog extends Dialog {
       pages.appendChild(page);
       this.sections.set(name, page);
     };
-    const accentRow = el('<label class="cv-field"><span>Accent</span></label>');
+    const accentRow = el('<label class="cv-field"><span></span></label>');
+    labelText(q(accentRow, 'span'), 'Accent');
     accentRow.appendChild(this.accent);
-    const reset = el<HTMLButtonElement>('<button class="cv-btn cv-btn-danger" type="button">Reset All Preferences...</button>');
+    const reset = el<HTMLButtonElement>('<button class="cv-btn cv-btn-danger" type="button"></button>');
+    setText(reset, t('Reset All Preferences...'));
     reset.addEventListener('click', () => {
-      void confirmAction('Reset all preferences?', 'Every preference of this window goes back to how formNET comes; the recording, the root certificate and the server\'s settings are kept. formNET reloads.', 'Reset', true).then((ok) => {
+      void confirmAction('Reset all preferences?', 'Every preference of this window goes back to how FormNET comes; the recording, the root certificate and the server\'s settings are kept. FormNET reloads.', 'Reset', true).then((ok) => {
         if (!ok) return;
         for (const k of Object.keys(localStorage)) if (k.startsWith(PREFIX) || k === STORAGE_KEY) localStorage.removeItem(k);
         location.reload();
       });
     });
     add('General',
-      grp('Startup', this.homeRow.el, this.homeClearRow.el, nt('The Home screen covers the views. At launch it shows while the recording is empty and leaves when the first flow arrives or a view is chosen; with the second choice on it comes back when Clear Recording empties it. The brand mark at the top left opens it at any time; Esc leaves it.')),
+      grp('Startup', this.homeRow.el, this.homeClearRow.el, nt('The Home screen covers the views. At launch it shows while the recording is empty and leaves when the first flow arrives or a view is chosen; with the second choice on it comes back when Clear Recording empties it. The brand mark at the top left opens it at any time, and Home opened that way stays while flows arrive; Esc leaves it.')),
       grp('Behavior', this.liveRow.el, this.rowsRow.el, this.confirmClearRow.el, nt('Live keeps the Flows table following new flows; paused, the rows stay put while flows keep arriving. The table draws the newest rows that match the filter, up to the number chosen; the export always takes every matching flow.')),
       grp('Settings Storage', this.storage.el),
       grp('Reset', reset));
     add('Interface',
-      grp('Theme', themes, nt('Right-click a theme to favorite it. Theme and accent are shared with NodeMode on this device.'), this.themeAutoRow.el, cols(this.themeLightRow.el, this.themeDarkRow.el), nt('Match System Appearance switches between the light and dark theme chosen here when the appearance of the computer changes.'), accentRow, this.intensityRow.el, nt('Intensity sets how strongly the accent tints what it marks; 100% is the design\'s.')),
-      grp('Language, Text and Scale', this.languageRow.el, cols(this.fontSizeRow.el, this.scaleRow.el), nt('Text size scales the interface\'s text; scale zooms the whole window.')),
+      grp('Theme', themes, nt('Right-click a theme to favorite it. Theme and accent are shared with NodeMode on this device.'), this.themeAutoRow.el, cols(this.themeLightRow.el, this.themeDarkRow.el), nt('Match System Appearance switches between the light and dark theme chosen here when the appearance of the computer changes; a theme picked by hand stays until the next change of a preference or of the appearance.'), accentRow, this.intensityRow.el, nt('Intensity sets how strongly the accent tints what it marks; 100% is the design\'s.')),
+      grp('Language, Text and Scale', this.languageRow.el, nt('The language of the whole interface. Host names, paths, headers and bodies stay as the programs sent them.'), cols(this.fontSizeRow.el, this.scaleRow.el), nt('Text size scales the interface\'s text; scale zooms the whole window.')),
       grp('Motion and Notices', this.animationsRow.el, this.noticeSecondsRow.el, this.tooltipsRow.el));
     add('Capture',
       grp('HTTPS', this.https.el),
+      grp('Root Certificate', this.root.el),
       grp('Passthrough', this.passthrough.el),
       grp('Proxy', this.proxy.el));
     add('Machine',
@@ -172,6 +177,7 @@ export class SettingsDialog extends Dialog {
     new ResizeObserver(() => this.queueWire()).observe(frame);
     window.addEventListener('resize', () => this.queueWire());
     this.button('Done', 'primary', () => this.close());
+    this.onClose = () => this.agents.mask();
     this.grid.addEventListener('contextmenu', (e) => {
       const id = (e.target as HTMLElement).closest<HTMLElement>('[data-theme-id]')?.dataset.themeId;
       if (!id) return;
@@ -189,6 +195,7 @@ export class SettingsDialog extends Dialog {
     this.accent.addEventListener('input', () => { setAccent(this.accent.value); this.sync(); });
     document.addEventListener('nm:ui-settings-changed', () => { if (this.isOpen) this.sync(); });
     deps.store.subscribe((s, prev) => { if (s.status !== prev.status) this.refreshPanels(); });
+    onLanguage(() => { this.refreshPanels(); this.sync(); this.queueWire(); });
     this.showSection('General');
   }
 
@@ -210,6 +217,7 @@ export class SettingsDialog extends Dialog {
     this.tooltipsRow.set(this.prefs.showTooltips);
     this.machineSortRow.set(this.prefs.machineSort);
     this.intensityRow.set(Math.round((readChoice().intensity ?? 1) * 100));
+    if (!this.isOpen) this.agents.mask();
     this.refreshPanels();
     if (section && this.sections.has(section)) this.showSection(section);
     this.sync();
@@ -222,6 +230,7 @@ export class SettingsDialog extends Dialog {
     const status = this.deps.store.get().status;
     this.storage.refresh(status);
     this.https.refresh(status);
+    this.root.refresh(status);
     this.passthrough.refresh(status);
     this.proxy.refresh(status);
     this.agents.refresh(status);
@@ -298,9 +307,13 @@ export class SettingsDialog extends Dialog {
       T = tab.getBoundingClientRect();
     }
     const R = s.rail.getBoundingClientRect(), H = head.getBoundingClientRect();
-    const portY = Math.round(H.bottom - F.top), sx = Math.round(T.right - F.left), ty = Math.round(T.top - F.top + T.height / 2);
-    const rr = R.right - F.left, trunk = Math.round(rr - rr * 0.45), dy = portY - ty, r = 10, dir = dy > 0 ? 1 : -1;
-    const d = Math.abs(dy) < 2 * r ? `M ${sx} ${ty} H ${trunk} V ${portY} H -7` : `M ${sx} ${ty} H ${trunk - r} a ${r} ${r} 0 0 ${dir > 0 ? 1 : 0} ${r} ${dir * r} V ${portY - dir * r} a ${r} ${r} 0 0 ${dir > 0 ? 0 : 1} ${r} ${dir * r} H -7`;
+    // Left to right the rail floats left of the frame and the port sits on the frame's left edge; right to left both
+    // are mirrored, so the wire runs from the tab's left edge rightwards to a port on the frame's right edge.
+    const rtl = getComputedStyle(s.frame).direction === 'rtl', w = s.frame.clientWidth, x = rtl ? -1 : 1;
+    const portY = Math.round(H.bottom - F.top), sx = Math.round(rtl ? T.left - F.left : T.right - F.left), ty = Math.round(T.top - F.top + T.height / 2);
+    const gap = rtl ? R.left - F.right : R.right - F.left, trunk = Math.round((rtl ? w : 0) + gap * 0.55), end = rtl ? w + 7 : -7;
+    const dy = portY - ty, r = 10, dir = dy > 0 ? 1 : -1, sweep = (dir > 0) === !rtl ? 1 : 0;
+    const d = Math.abs(dy) < 2 * r ? `M ${sx} ${ty} H ${trunk} V ${portY} H ${end}` : `M ${sx} ${ty} H ${trunk - x * r} a ${r} ${r} 0 0 ${sweep} ${x * r} ${dir * r} V ${portY - dir * r} a ${r} ${r} 0 0 ${1 - sweep} ${x * r} ${dir * r} H ${end}`;
     if (d !== this.wireD) { this.wireD = d; s.shade.setAttribute('d', d); s.line.setAttribute('d', d); }
     if (portY !== this.portY) { this.portY = portY; s.port.style.transform = `translateY(${portY}px)`; }
   }
@@ -323,7 +336,8 @@ export class SettingsDialog extends Dialog {
       setClass(b, 'is-fav', fav);
       const order = fav ? '-1' : '0';
       if (b.style.order !== order) b.style.order = order;
-      const title = fav ? `${THEMES[id]?.label ?? id} (favorite, right-click to remove)` : `${THEMES[id]?.label ?? id} (right-click to add to favorites)`;
+      const name = THEMES[id]?.label ?? id;
+      const title = tf(fav ? '{name} (favorite, right-click to remove)' : '{name} (right-click to add to favorites)', { name: t(name) });
       if (b.title !== title) b.title = title;
       const border = active ? c.accentColor : THEMES[id]?.vars['--border-color'] ?? '';
       if (b.dataset.border !== border) { b.dataset.border = border; b.style.borderColor = border; }

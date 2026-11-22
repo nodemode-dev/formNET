@@ -3,7 +3,8 @@ import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, InterceptMode, P
 
 const base = location.origin;
 
-// SessionError is thrown when the server answers 401: the page has no session cookie.
+// SessionError is thrown when the server answers 401: the run's token (the bearer header, or ?token= on the
+// event stream and downloads) is missing or no longer the server's.
 export class SessionError extends Error {
   constructor() {
     super("no session");
