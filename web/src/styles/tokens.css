@@ -16,8 +16,8 @@
   /* Native controls (checkboxes, dropdowns, scrollbars) in the dark, as the target's; the light profiles set light. */
   color-scheme: dark;
   /* ── accent (settings-driven in the app; --accent-color-dim is accent + 33 alpha); the target's lavender ── */
-  --accent-color: #f97316;
-  --accent-color-dim: #f9731633;
+  --accent-color: #8681dd;
+  --accent-color-dim: #8681dd33;
   --accent-color-hover: color-mix(in srgb, var(--accent-color) 82%, #ffffff);
 
   /* ── surfaces (theme-owned; the Studio Dark profile's values, measured from the target: UI_SPEC.md) ── */
@@ -108,7 +108,8 @@
   --bg-input: var(--bg-tertiary);
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-scrim: rgba(0, 0, 0, 0.6);
-  --text-on-accent: #fff;
+  --bg-scrim-blur: rgba(8, 6, 14, 0.45);   /* the dialog scrim under its backdrop blur */
+  --text-on-accent: #111111;
   --text-on-cta: #000;          /* the homepage New Flow button: black on accent */
   --border-soft: rgba(255, 255, 255, 0.08);
   --accent-tint: color-mix(in srgb, var(--accent-color) 6%, transparent);
@@ -155,7 +156,11 @@
      section 6.2.2) so a companion surface embedded next to the app never
      collides. Component CSS uses var(--z-*) only. Never a raw number,
      never 9999. */
+  --z-under: -1;          /* a backdrop drawn under its own element's content */
   --z-base: 0;
+  --z-local-2: 2;         /* local stacking inside one panel: comment popover, dock split */
+  --z-local-4: 4;         /* the open Properties column over its neighbours */
+  --z-local-5: 5;         /* the Properties resize edge over the open column */
   --z-raised: 8;          /* hovered card lift (the app's .node:hover) */
   --z-selected: 9;        /* selected card (the app's .node.selected) */
   --z-rail: 10;           /* mini icon rail */
@@ -177,6 +182,13 @@
   --z-debug: 100000;      /* development only */
 }
 
+:root[data-oled] {
+  --bg-hover: rgba(255, 255, 255, 0.1);
+  --border-soft: rgba(255, 255, 255, 0.12);
+  --surface-1: var(--bg-primary);
+  --line-0: var(--border-color);
+}
+
 body.theme-light {
   color-scheme: light;
   /* The redesign's black header strips and white primary buttons, as the light profiles need them. */
@@ -189,6 +201,7 @@ body.theme-light {
   --bg-input: var(--bg-secondary);
   --bg-hover: rgba(0, 0, 0, 0.06);
   --bg-scrim: rgba(40, 36, 28, 0.45);
+  --bg-scrim-blur: rgba(40, 36, 28, 0.45);
   --border-soft: rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 14px rgba(96, 90, 70, 0.16);
   --shadow-window: 0 18px 44px rgba(96, 90, 70, 0.22);
