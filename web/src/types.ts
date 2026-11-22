@@ -1,4 +1,5 @@
 // JSON shapes the server sends; see internal/server/server.go and internal/flow/flow.go.
+import type { RemoteStatus, RulesSummary, ThrottleStatus } from "./types-traffic.ts";
 
 export interface Header {
   name: string;
@@ -53,6 +54,10 @@ export interface Flow {
   error?: string;
   resent_from?: string;
   edited?: boolean;
+  rules?: string[];
+  paused?: "request" | "response";
+  throttled?: boolean;
+  notes?: string[];
 }
 
 export interface Body {
@@ -158,6 +163,9 @@ export interface Status {
   notices?: string[] | null;
   now: string;
   sysproxy?: SysProxyStatus;
+  rules?: RulesSummary;
+  throttle?: ThrottleStatus;
+  remote?: RemoteStatus;
 }
 
 export interface SysProxyService {
