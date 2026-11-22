@@ -2,10 +2,16 @@
 
 package ca
 
-import "os"
+import (
+	"fmt"
 
-// checkKeyMode only confirms the file exists; Windows carries no Unix mode bits.
+	"github.com/nodemode-dev/formnet/internal/userfile"
+)
+
+// checkKeyMode refuses a key file that other users on this computer could read.
 func checkKeyMode(path string) error {
-	_, err := os.Stat(path)
-	return err
+	if err := userfile.Check(path); err != nil {
+		return fmt.Errorf("ca: %w", err)
+	}
+	return nil
 }
