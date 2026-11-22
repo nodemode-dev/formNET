@@ -14,6 +14,17 @@ Built by Vite into `web/dist`, embedded in the formnet server and shown in the d
 
 The SIL Open Font License 1.1 text is at https://openfontlicense.org.
 
+## The server's Go modules
+
+Linked into the `formnet` binary to decode `br` and `zstd` bodies for display, pure Go (built with `CGO_ENABLED=0`). Versions from `go.mod`; licences as their `LICENSE` files in the module say. Only the packages listed in Notes are linked: the rest of `klauspost/compress` (gzhttp under Apache-2.0, the s2 command helpers under MIT, snappy under BSD-3-Clause) is not in the binary. `github.com/xyproto/randomstring` v1.0.5 (BSD-3-Clause, Copyright 2023 Alexander F. Rødseth) appears in `go.sum` only as a test dependency of the brotli module and is not linked. The full licence texts of the linked packages are in `licenses/`, copied unchanged from the modules, and travel with the desktop app.
+
+| Module | Version | Licence | Source | Notes |
+| --- | --- | --- | --- | --- |
+| github.com/andybalholm/brotli | v1.3.0 | MIT | https://github.com/andybalholm/brotli | packages brotli and brotli/matchfinder; Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors |
+| github.com/klauspost/compress | v1.20.5 | BSD-3-Clause | https://github.com/klauspost/compress | packages zstd, huff0, fse, internal/cpuinfo, internal/le, internal/regmask and the module root; Copyright (c) 2012 The Go Authors, Copyright (c) 2019 Klaus Post |
+| github.com/klauspost/compress (zstd/internal/xxhash) | v1.20.5 | MIT | https://github.com/klauspost/compress | its own LICENSE.txt; Copyright (c) 2016 Caleb Spare |
+| github.com/klauspost/compress (internal/snapref) | v1.20.5 | BSD-3-Clause | https://github.com/klauspost/compress | its own LICENSE; Copyright (c) 2011 The Snappy-Go Authors |
+
 ## The desktop shell's crates (src-tauri)
 
 Every Rust crate linked into `formnet-desktop` for macOS (aarch64-apple-darwin, x86_64-apple-darwin), Windows (x86_64-pc-windows-msvc) or Linux (x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu), resolved from `src-tauri/Cargo.lock`: the normal dependency tree with default features, without build dependencies and proc-macro crates, which run at compile time and are not part of the program. Licence and source are the `license` and `repository` fields of `cargo metadata --format-version 1`. Where a crate offers a choice of licences, the recipient may use any one of them.
