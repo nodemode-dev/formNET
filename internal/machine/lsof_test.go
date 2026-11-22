@@ -4,7 +4,7 @@ import "testing"
 
 const lsofSample = `p617
 crapportd
-Lgregorybarnes
+L[user]
 f10
 tIPv4
 PTCP
@@ -25,7 +25,7 @@ PUDP
 n*:3722
 p622
 cidentityservicesd
-Lgregorybarnes
+L[user]
 f5
 tIPv4
 PUDP
@@ -43,7 +43,7 @@ PUDP
 n192.168.0.127:55131->74.125.138.94:443
 p9000
 cGoogle Chrome Helper
-Lgregorybarnes
+L[user]
 f30
 tIPv6
 PTCP
@@ -56,7 +56,7 @@ func TestParseLsof(t *testing.T) {
 	if len(conns) != 6 {
 		t.Fatalf("connections: %d, want 6 (unbound *:* left out)\n%+v", len(conns), conns)
 	}
-	if info[617].name != "rapportd" || info[617].user != "gregorybarnes" || info[9000].name != "Google Chrome Helper" {
+	if info[617].name != "rapportd" || info[617].user != "[user]" || info[9000].name != "Google Chrome Helper" {
 		t.Fatalf("process info: %+v", info)
 	}
 	want := []Connection{
