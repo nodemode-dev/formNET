@@ -143,7 +143,9 @@ export class PopupMenu {
     const { width: w, height: h } = this.panel.getBoundingClientRect();
     // As native menus: below and right of the pointer when it fits, otherwise above or to the left of it, so the
     // pointer sits at a corner and never over an item (clamping alone could put a submenu under it, opening it).
-    const fitsRight = x + w <= window.innerWidth - 4, fitsBelow = y + h <= window.innerHeight - 4;
+    // Right to left the menu opens leftwards of the point first, as the system's menus do there.
+    const rtl = document.documentElement.dir === 'rtl';
+    const fitsRight = rtl ? x - w < 4 : x + w <= window.innerWidth - 4, fitsBelow = y + h <= window.innerHeight - 4;
     const left = Math.max(4, Math.min(fitsRight ? x : x - w, window.innerWidth - w - 4));
     const top = Math.max(4, Math.min(fitsBelow ? y : y - h, window.innerHeight - h - 4));
     this.panel.style.left = `${Math.round(left)}px`;
@@ -159,7 +161,9 @@ export class PopupMenu {
     this.panel.scrollTop = 0;
     const w = this.panel.offsetWidth, h = this.panel.offsetHeight, pad = 4;
     const right = row.right - 2, left = row.left - w + 2;
-    const x = right + w <= window.innerWidth - pad ? right : Math.max(pad, left);
+    const x = document.documentElement.dir === 'rtl'
+      ? (left >= pad ? left : Math.min(right, window.innerWidth - w - pad))
+      : right + w <= window.innerWidth - pad ? right : Math.max(pad, left);
     const y = Math.max(pad, Math.min(row.top - pad, window.innerHeight - h - pad));
     this.panel.style.left = `${Math.round(x)}px`;
     this.panel.style.top = `${Math.round(y)}px`;
@@ -335,7 +339,7 @@ export class MenuBar {
     this.openIndex = i;
     setClass(b.btn, 'is-open', true);
     const r = b.btn.getBoundingClientRect();
-    b.menu.openAt(r.left, r.bottom + 4);
+    b.menu.openAt(document.documentElement.dir === 'rtl' ? r.right : r.left, r.bottom + 4);
     if (keyboard) b.menu.items()[0]?.focus();
   }
 
