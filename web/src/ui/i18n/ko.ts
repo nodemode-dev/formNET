@@ -147,7 +147,7 @@ export const ko: Record<string, string> = {
   "Flows": "플로우",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "보관 중인 플로우와 필터가 표시하는 개수입니다. 클릭하면 다음 표시, Shift+클릭하면 이전 표시로 바뀝니다.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "이 루트 인증서는 FormNET이 이 컴퓨터에서 만들었습니다. 개인 키는 데이터 폴더에 남아 있으며 절대 제공되지 않고, 인증서만 다운로드할 수 있습니다. 직접 명령을 실행하기 전에는 아무것도 설치되지 않으며, 자동에서는 이 컴퓨터가 루트 인증서를 신뢰한 뒤에만 HTTPS를 복호화합니다.",
-  "FormNET on GitHub": "GitHub의 FormNET",
+  "FormNET Website": "FormNET 웹사이트",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}, NodeAgentc, Inc. 제작: 웹사이트, 앱 또는 머신 전체가 네트워크에서 실제로 하는 일을 보여 줍니다.",
   "Good afternoon": "좋은 오후입니다",
   "Good evening": "좋은 저녁입니다",

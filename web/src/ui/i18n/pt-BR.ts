@@ -147,7 +147,7 @@ export const ptBR: Record<string, string> = {
   "Flows": "Fluxos",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Fluxos mantidos e quantos o filtro mostra. Clique para a próxima leitura, Shift+clique para a anterior.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "O FormNET criou este certificado raiz neste computador. A chave privada fica na pasta de dados e nunca é servida; só o certificado pode ser baixado. Nada é instalado até você mesmo executar o comando, e em Automático o HTTPS só é aberto quando este computador confia no certificado raiz.",
-  "FormNET on GitHub": "FormNET no GitHub",
+  "FormNET Website": "Site do FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} da NodeAgentc, Inc.: o que um site, um app ou a máquina inteira realmente faz na rede.",
   "Good afternoon": "Boa tarde",
   "Good evening": "Boa noite",

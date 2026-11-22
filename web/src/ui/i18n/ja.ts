@@ -147,7 +147,7 @@ export const ja: Record<string, string> = {
   "Flows": "フロー",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "保持しているフローと、絞り込みで表示している数。クリックで次の表示、Shift+クリックで前の表示に切り替えます。",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "このルート証明書は FormNET がこのコンピューターで作成したものです。秘密鍵はデータフォルダーに置かれたままで、配信されることはありません。ダウンロードできるのは証明書だけです。ご自身でコマンドを実行するまで何もインストールされません。また自動では、このコンピューターがルート証明書を信頼してはじめて HTTPS を復号します。",
-  "FormNET on GitHub": "GitHub の FormNET",
+  "FormNET Website": "FormNET のウェブサイト",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} (NodeAgentc, Inc.)：ウェブサイト、アプリ、マシン全体がネットワーク上で実際に何をしているかを示します。",
   "Good afternoon": "こんにちは",
   "Good evening": "こんばんは",

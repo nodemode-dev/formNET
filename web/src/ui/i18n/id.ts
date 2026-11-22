@@ -147,7 +147,7 @@ export const id: Record<string, string> = {
   "Flows": "Alur",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Alur yang disimpan, dan berapa banyak yang ditampilkan filter. Klik untuk pembacaan berikutnya, Shift+klik untuk sebelumnya.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET membuat root ini di komputer ini. Kunci privatnya tetap berada di folder data dan tidak pernah disajikan; hanya sertifikatnya yang dapat diunduh. Tidak ada yang diinstal sampai Anda menjalankan perintahnya sendiri, dan pada mode Otomatis HTTPS baru didekripsi setelah komputer ini memercayai sertifikat root.",
-  "FormNET on GitHub": "FormNET di GitHub",
+  "FormNET Website": "Situs Web FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} oleh NodeAgentc, Inc.: apa yang sebenarnya dilakukan situs web, aplikasi, atau seluruh komputer di jaringan.",
   "Good afternoon": "Selamat siang",
   "Good evening": "Selamat malam",

@@ -146,7 +146,7 @@ export const sv: Record<string, string> = {
   "Flows": "Flöden",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Sparade flöden och hur många filtret visar. Klicka för nästa värde, Shift+klicka för föregående.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET har skapat det här rotcertifikatet på den här datorn. Dess privata nyckel stannar i datamappen och lämnas aldrig ut; bara certifikatet kan laddas ner. Inget installeras förrän du själv kör kommandot, och i Auto dekrypteras HTTPS först när den här datorn litar på rotcertifikatet.",
-  "FormNET on GitHub": "FormNET på GitHub",
+  "FormNET Website": "FormNETs webbplats",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} från NodeAgentc, Inc.: vad en webbplats, en app eller hela datorn faktiskt gör i nätverket.",
   "Good afternoon": "God eftermiddag",
   "Good evening": "God kväll",

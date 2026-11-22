@@ -147,7 +147,7 @@ export const zhCN: Record<string, string> = {
   "Flows": "数据流",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "已保留的数据流，以及筛选后显示的数量。单击切换到下一项读数，按住 Shift 单击切换到上一项。",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "此根证书由 FormNET 在本机生成。其私钥保存在数据文件夹中，从不对外提供；只能下载证书。在您亲自运行命令之前不会安装任何内容；在自动模式下，只有本机信任根证书后才会解密 HTTPS。",
-  "FormNET on GitHub": "GitHub 上的 FormNET",
+  "FormNET Website": "FormNET 网站",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}，NodeAgentc, Inc. 出品：网站、应用或整台机器在网络上实际做了什么。",
   "Good afternoon": "下午好",
   "Good evening": "晚上好",

@@ -147,7 +147,7 @@ export const vi: Record<string, string> = {
   "Flows": "Luồng",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Các luồng đã giữ và số luồng bộ lọc hiển thị. Nhấp để xem số đọc tiếp theo, Shift+nhấp để xem số trước.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET đã tạo chứng chỉ gốc này trên máy tính này. Khóa riêng của nó nằm trong thư mục dữ liệu và không bao giờ được cung cấp; chỉ có thể tải chứng chỉ. Không có gì được cài đặt cho đến khi bạn tự chạy lệnh, và ở chế độ Tự động, HTTPS chỉ được giải mã khi máy tính này tin cậy chứng chỉ gốc.",
-  "FormNET on GitHub": "FormNET trên GitHub",
+  "FormNET Website": "Trang web FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} của NodeAgentc, Inc.: một trang web, một ứng dụng hay cả máy tính thực sự làm gì trên mạng.",
   "Good afternoon": "Chào buổi chiều",
   "Good evening": "Chào buổi tối",

@@ -139,7 +139,7 @@ export function registerCommands(d: CommandDeps): Commands {
     } },
     { id: 'help', label: 'Proxy Setup...', keys: ['F1'], run: setup('proxy-card') },
     { id: 'help-trust-root', label: 'Trust the Root Certificate...', run: () => d.settings.show('Capture') },
-    { id: 'github', label: 'FormNET on GitHub', run: () => { window.open('https://github.com/nodemode-dev/formNET', '_blank', 'noopener'); } },
+    { id: 'website', label: 'FormNET Website', run: () => { window.open('https://formai.studio/apps/formnet/', '_blank', 'noopener'); } },
     { id: 'about', label: 'About FormNET', run: () => { const s = st.get().status; toast(t('FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.').replace('{version}', s?.version ?? '').replace('  ', ' ')); } },
   );
   void wantsNativeMenus;

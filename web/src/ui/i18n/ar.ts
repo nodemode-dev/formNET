@@ -147,7 +147,7 @@ export const ar: Record<string, string> = {
   "Flows": "التدفقات",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "التدفقات المحفوظة وعدد ما تعرضه التصفية. انقر للقراءة التالية، وانقر مع Shift للسابقة.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "أنشأ FormNET هذه الشهادة الجذر على هذا الحاسوب. يبقى مفتاحها الخاص في مجلد البيانات ولا يُقدَّم أبدًا؛ ولا يمكن تنزيل سوى الشهادة. لا يُثبَّت شيء حتى تشغّل الأمر بنفسك، وفي الوضع التلقائي لا يُفك تشفير HTTPS إلا بعد أن يثق هذا الحاسوب بالشهادة الجذر.",
-  "FormNET on GitHub": "FormNET على GitHub",
+  "FormNET Website": "موقع FormNET على الويب",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} من NodeAgentc, Inc.: ما يفعله موقع ويب أو تطبيق أو الجهاز بأكمله فعليًا على الشبكة.",
   "Good afternoon": "طاب يومك",
   "Good evening": "مساء الخير",
