@@ -1106,7 +1106,7 @@ dependencies = [
 
 [[package]]
 name = "formnet-desktop"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "getrandom 0.3.4",
  "gtk",
