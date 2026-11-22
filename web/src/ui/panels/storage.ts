@@ -22,7 +22,7 @@ export class StorageSection {
     const folder = dataFolder(status);
     setValue(this.path, folder);
     setText(this.note, folder
-      ? 'The root certificate, its key and this run\'s token live there (FORMNET_DATA chooses it). The server\'s settings come from FORMNET_* variables, listed in the README. The window\'s own preferences (this dialog, the theme) stay in this browser profile.'
+      ? 'The root certificate, its key and this run\'s token live there (FORMNET_DATA chooses it). The HTTPS choice and the passthrough list, set here or in Setup, are kept when FormNET restarts; the other server settings come from FORMNET_* variables, listed in the README. The window\'s own preferences (this dialog, the theme) stay in this browser profile.'
       : 'The data folder is shown once the server has answered.');
   }
 }

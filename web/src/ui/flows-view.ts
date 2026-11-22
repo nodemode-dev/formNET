@@ -120,7 +120,7 @@ function buildRow(f: Flow, select: (id: string) => void): HTMLTableRowElement {
     h("td", { class: "proc", title: f.client_pid ? `pid ${f.client_pid}, ${f.client}` : f.client }, f.client_process ?? ""),
     h("td", { class: `mono ${methodClass(f.method)}` }, f.method),
     h("td", { class: "host" }, f.host, f.port && f.port !== 443 && f.port !== 80 ? h("span", { class: "dim" }, `:${f.port}`) : null),
-    h("td", { class: "path mono", title: f.url }, kind ? h("span", { class: `kind kind-${f.kind}` }, kind) : null, f.kind === "tunnel" ? "" : pathWithQuery(f.path, f.query)),
+    h("td", { class: "path mono", title: f.url }, kind ? h("span", { class: `kind kind-${f.kind}` }, kind) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
     h("td", { class: `status mono ${statusClass(f.status, f.error)}`, title: f.error ?? "" }, status),
     h("td", { class: "type" }, shortType(f.response?.content_type)),
     h("td", { class: "num mono" }, bytes(f.bytes_sent)),
