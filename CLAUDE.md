@@ -7,7 +7,7 @@ What a program actually does on the network, not what it promises: an intercepti
 ## Layout
 
 - `cmd/formnet/` the command: `serve` (default), `url`, `open`, `ca`, `snapshot`, `version`, `help`.
-- `internal/config/` settings from `FORMNET_*` variables; both listeners are loopback-only and refuse anything else.
+- `internal/config/` settings from `FORMNET_*` variables; both listeners are loopback-only and refuse anything else, except the proxy's listeners for capture from other devices (below).
 - `internal/flow/` the record: `Flow`, the `Store` bounded by a flow count and a byte budget, with counted subscriptions and an epoch, per-host summaries, the known-host labels (`classify.go`) and a streaming HAR export.
 - `internal/ca/` the local root certificate (made on first run in the data folder) and per-host leaf certificates.
 - `internal/proxy/` the proxy: plain HTTP forwarding, CONNECT tunnels, TLS interception with the root, passthrough patterns, body capture up to the limit, byte and time accounting into the Store.
@@ -23,7 +23,7 @@ What a program actually does on the network, not what it promises: an intercepti
 
 ## Rules
 
-- Never listen on a non-loopback address. The proxy and the API carry the bodies of everything FormNET sees.
+- Never listen on a non-loopback address. The proxy and the API carry the bodies of everything FormNET sees. The one exception is the owner's: capture from other devices (`internal/proxy/remote.go`), a switch that is off by default, opens the proxy only (never the API or the page) on this computer's network addresses, needs an address allow list with at least one entry, and closes any other client before reading from it.
 - Loopback is not a trust boundary: every program and user on the computer shares it. The API answers only with the run's session token (`FORMNET_TOKEN`, or the one written to `<data>/token` with mode 0600). Never add a route that serves recordings without it.
 - The proxy never connects to FormNET's own addresses, and never to a loopback address reached through a host name (DNS rebinding into local services). Private ranges stay reachable; intranet hosts are legitimate.
 - HTTPS is opened only when the root is trusted (or `FORMNET_INTERCEPT=on`); otherwise it is tunnelled and counted, and the UI says so. Keep the wording and the behaviour in step.

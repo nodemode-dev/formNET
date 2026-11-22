@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nodemode-dev/formnet/internal/ca"
@@ -90,6 +91,8 @@ type Proxy struct {
 
 	refusedMu sync.Mutex
 	refused   map[string]time.Time // last refused handshake per program and host
+
+	ext atomic.Pointer[trafficState] // rules, throttle, breakpoints and remote capture (traffic.go)
 }
 
 // DefaultTrustInterval is how often auto mode reads the root's trust state again.
@@ -217,6 +220,9 @@ func requireLoopback(addr string) error {
 
 // ServeHTTP handles one proxied request: a tunnel, an upgrade or a plain exchange.
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if p.preflight(w, r) {
+		return
+	}
 	if r.Method == http.MethodConnect {
 		p.handleConnect(w, r)
 		return
@@ -234,6 +240,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *Proxy) serveOrigin(w http.ResponseWriter, r *http.Request, o origin) {
 	if isWebSocketUpgrade(r.Header) {
 		p.handleWebSocket(w, r, o)
+		return
+	}
+	if p.serveHooked(w, r, o) {
 		return
 	}
 	p.forward(w, r, o)

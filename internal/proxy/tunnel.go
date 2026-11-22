@@ -72,6 +72,7 @@ func (p *Proxy) relayTo(client *peekedConn, upstream net.Conn, o origin) {
 			f.TLS.ServerName = o.host
 		}
 	}
+	upstream, f.Throttled = p.throttleTunnel(upstream, o)
 	f = p.opts.Store.Add(f)
 	sent, received := pipe(client, upstream, p.opts.TunnelIdle)
 	f.BytesSent, f.BytesReceived = sent, received

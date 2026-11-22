@@ -107,6 +107,8 @@ Settings (environment):
   FORMNET_REVERSE_DNS       1 to name remote addresses in the machine view (sends PTR queries); default off
   FORMNET_TOKEN             this run's session token; default a new one, kept in <data>/token
   FORMNET_SYSTEM_PROXY      1 to point the system proxy at formnet while it runs, 0 not to (macOS, Windows); default off
+  FORMNET_REMOTE_CAPTURE    1 to let other devices use the proxy on this computer's network addresses, 0 not to; default off
+  FORMNET_REMOTE_ALLOW      addresses or CIDR ranges allowed to, comma-separated; at least one is needed to turn it on
 
 Interception, the passthrough list and the system proxy chosen in the web
 client are kept in <data>/settings.json; FORMNET_INTERCEPT,
@@ -206,6 +208,7 @@ func serve(stdout, stderr io.Writer) int {
 		Refuse:        []string{apiAddr, proxyAddr},
 		Log:           log,
 	})
+	startRemote := useTraffic(px, cfg, saved, log)
 	proxyErr := make(chan error, 1)
 	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
@@ -214,7 +217,7 @@ func serve(stdout, stderr io.Writer) int {
 	terminals := terminal.New(terminal.Options{APIAddr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Log: log})
 	defer terminals.Close()
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, SystemProxy: systemProxy, BodyLimit: cfg.BodyLimit, Terminals: terminals}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, SystemProxy: systemProxy, BodyLimit: cfg.BodyLimit, Terminals: terminals, Traffic: px}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
@@ -225,6 +228,7 @@ func serve(stdout, stderr io.Writer) int {
 		log.Error("proxy", "addr", proxyAddr, "err", err)
 		return 1
 	}
+	startRemote()
 	if err := writeEndpoints(cfg.Data, endpoints{Product: app.Product, Version: app.Version, PID: os.Getpid(), Addr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Started: time.Now().UTC()}); err != nil {
 		log.Warn("endpoints file", "err", err)
 	}

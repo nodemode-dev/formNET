@@ -19,7 +19,18 @@
 //	GET  /api/ca                   CA info and the trust command
 //	GET  /ca.pem                   the root certificate, for installing trust
 //	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows); credential headers redacted unless secrets=1
-//	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, machine.snapshot, ping
+//	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, machine.snapshot, breakpoint.paused, breakpoint.resumed, ping
+//	GET  /api/rules                the rule list {version, enabled, rules, intercept, https_note, notes}; rules change HTTPS only where it is opened
+//	PUT  /api/rules                {"rules": [...]}: replace the whole list, validated (400 names the field), kept in <data>/rules.json
+//	POST /api/rules/enabled        {"enabled": bool}: the switch that turns every rule off or on
+//	GET  /api/breakpoints          {paused: [...], timeout_seconds, max_paused}
+//	POST /api/breakpoints          {"timeout_seconds", "max_paused"} (either field), kept in <data>/settings.json
+//	POST /api/breakpoints/{id}/continue  let a paused exchange go on, optionally edited: {method, url, headers, body_text | body_base64} at a request, {status, headers, body_text | body_base64} at a response
+//	POST /api/breakpoints/{id}/abort     close the paused exchange's client connection
+//	GET  /api/throttle             {enabled, preset, down_kbps, up_kbps, latency_ms, hosts, presets}
+//	POST /api/throttle             any of those fields but presets, kept in <data>/settings.json
+//	GET  /api/remote               capture from other devices: {enabled, allow, from_env, port, addresses, listening, refused, last_refused, cert_url, error}
+//	POST /api/remote               {"enabled": bool, "allow": [CIDR or address]} (either field; on needs one allow entry), kept in <data>/settings.json; the proxy only, never this API
 //	     /api/terminal...          the terminal dock and the agent finder, when Deps.Terminals is set (internal/terminal)
 //	GET  /                         the web client
 //
@@ -101,6 +112,8 @@ type Deps struct {
 	BodyLimit int64
 	// Terminals adds the dock's terminal and agent finder routes under /api/terminal; nil adds none.
 	Terminals interface{ Register(mux *http.ServeMux) }
+	// Traffic adds rules, breakpoints, the throttle and remote capture (rules_routes.go); nil adds none.
+	Traffic TrafficControl
 }
 
 // SystemProxyControl is what the API needs from the system proxy manager.
@@ -148,6 +161,7 @@ func Handler(d Deps) http.Handler {
 	if d.Terminals != nil {
 		d.Terminals.Register(mux)
 	}
+	s.registerRules(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "no such route") })
 	mux.Handle("/", s.client())
 	return s.guard(mux)
@@ -303,6 +317,8 @@ type statusBody struct {
 	Now     time.Time     `json:"now"`
 
 	SysProxy sysproxy.Status `json:"sysproxy"`
+
+	*TrafficStatus // rules, throttle, remote; absent when Deps.Traffic is nil
 }
 
 type machineStatus struct {
@@ -333,6 +349,8 @@ func (s *handler) status(w http.ResponseWriter, r *http.Request) {
 		Now:     time.Now(),
 
 		SysProxy: s.systemProxy(),
+
+		TrafficStatus: s.trafficStatus(),
 	})
 }
 
@@ -685,6 +703,7 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	flows, dropped := s.Store.SubscribeCounted(ctx)
 	snaps := s.Machine.Subscribe(ctx)
+	pauses := s.breakpointEvents(ctx)
 	send := func(event string, v any) bool {
 		raw, err := json.Marshal(v)
 		if err != nil {
@@ -722,6 +741,10 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if !send("machine.snapshot", snap) {
+				return
+			}
+		case e := <-pauses:
+			if !send(e.Type, e) {
 				return
 			}
 		case <-ticker.C:
