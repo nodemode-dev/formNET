@@ -1,8 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod engine_start;
 mod reveal;
 mod text_edit;
 mod traffic_lights;
+#[cfg(windows)]
+mod win_job;
 mod zoom;
 
 use std::path::PathBuf;
@@ -10,9 +13,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use engine_start::{Failure, Tail};
+use tauri::ipc::CapabilityBuilder;
 use tauri::webview::{DownloadEvent, NewWindowResponse};
 use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -23,6 +28,30 @@ const FALLBACK_LOGICAL: (f64, f64) = (1280.0, 840.0);
 const MIN_LOGICAL: (f64, f64) = (980.0, 640.0);
 const SCREEN_FRACTION: f64 = 0.9;
 const STOP_WAIT: Duration = Duration::from_secs(8);
+const PAGE_PERMISSIONS: &[&str] = &[
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-title",
+    "core:event:default",
+    "allow-set-window-title",
+    "allow-app-ready",
+    "allow-text-edit",
+    "allow-ui-zoom",
+];
+
+enum Step {
+    Server(CommandEvent),
+    Gone,
+    WaitOver,
+    GraceOver,
+}
 
 struct Server {
     child: Mutex<Option<CommandChild>>,
@@ -95,7 +124,19 @@ fn focus_main(handle: &AppHandle) {
     }
 }
 
+fn allow_page(handle: &AppHandle, port: u16) -> tauri::Result<()> {
+    let capability = PAGE_PERMISSIONS.iter().fold(
+        CapabilityBuilder::new("server-page")
+            .remote(format!("http://127.0.0.1:{port}"))
+            .local(false)
+            .window("main"),
+        |capability, permission| capability.permission(*permission),
+    );
+    handle.add_capability(capability)
+}
+
 fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
+    allow_page(handle, port)?;
     let url: Url = format!("http://127.0.0.1:{port}/?token={token}")
         .parse()
         .expect("loopback url");
@@ -178,91 +219,141 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
     Ok(())
 }
 
-fn fail(handle: &AppHandle, text: &str) {
-    close_splash(handle);
-    let quit = handle.clone();
+fn fail(handle: &AppHandle, failure: Failure, tail: &Tail) {
+    let text = engine_start::message(&failure, tail);
+    eprintln!("formnet desktop: {text}");
+    if let Some(splash) = handle.get_webview_window("splash") {
+        let _ = splash.hide();
+    }
+    stop_server(handle, engine_start::EXIT_GRACE);
     handle
         .dialog()
         .message(text)
         .title("FormNET")
-        .show(move |_| quit.exit(1));
+        .kind(MessageDialogKind::Error)
+        .blocking_show();
+    close_splash(handle);
+    handle.exit(1);
+}
+
+fn fail_soon(handle: AppHandle, failure: Failure) {
+    std::thread::spawn(move || fail(&handle, failure, &Tail::new("")));
+}
+
+fn ready_port(line: &str) -> Option<u16> {
+    line.trim()
+        .strip_prefix(READY)?
+        .trim_end_matches('/')
+        .parse::<u16>()
+        .ok()
+        .filter(|port| *port != 0)
+}
+
+fn after(late: &tauri::async_runtime::Sender<Step>, wait: Duration, step: Step) {
+    let late = late.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(wait);
+        let _ = late.blocking_send(step);
+    });
 }
 
 fn start(handle: AppHandle) {
     let dir = data_dir(&handle);
     if let Err(err) = std::fs::create_dir_all(&dir) {
-        fail(&handle, &format!("formNET could not create its data folder {}: {err}", dir.display()));
+        fail_soon(handle, Failure::Data(format!("{}: {err}", dir.display())));
         return;
     }
     let token = desktop_token();
     let spawned = handle
         .shell()
         .sidecar("formnet-server")
-        .map(|cmd| {
+        .map_err(|_| Failure::Missing)
+        .and_then(|cmd| {
             cmd.args(["serve"])
                 .env("FORMNET_DESKTOP", "1")
                 .env("FORMNET_TOKEN", &token)
                 .env("FORMNET_DATA", dir.as_os_str())
                 .env("FORMNET_ADDR", PREFERRED_ADDR)
                 .spawn()
+                .map_err(|err| match err {
+                    tauri_plugin_shell::Error::Io(io) if io.kind() == std::io::ErrorKind::NotFound => Failure::Missing,
+                    other => Failure::NotStarted(other.to_string()),
+                })
         });
     let (mut rx, child) = match spawned {
-        Ok(Ok(pair)) => pair,
-        Ok(Err(err)) | Err(err) => {
-            fail(&handle, &format!("The formNET server could not start: {err}"));
+        Ok(pair) => pair,
+        Err(failure) => {
+            fail_soon(handle, failure);
             return;
         }
     };
+    #[cfg(windows)]
+    win_job::hold_pid(child.pid());
     let server = handle.state::<Server>();
     server.child.lock().unwrap().replace(child);
     let stopped = server.stopped.clone();
     tauri::async_runtime::spawn(async move {
-        let mut port: Option<u16> = None;
-        let mut errors: Vec<String> = Vec::new();
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(bytes) if port.is_none() => {
-                    let line = String::from_utf8_lossy(&bytes);
-                    if let Some(rest) = line.trim().strip_prefix(READY) {
-                        if let Ok(found) = rest.trim_end_matches('/').parse::<u16>() {
-                            port = Some(found);
-                            match open_main(&handle, found, &token) {
-                                Ok(()) => {}
-                                Err(err) => {
-                                    fail(&handle, &format!("formNET could not open its window: {err}"));
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-                CommandEvent::Stderr(bytes) if port.is_none() => {
-                    let line = String::from_utf8_lossy(&bytes).trim().to_string();
-                    if line.contains("level=ERROR") {
-                        errors.push(line);
-                    }
-                }
-                CommandEvent::Terminated(_) => {
+        let (tx, mut steps) = tauri::async_runtime::channel::<Step>(64);
+        let late = tx.clone();
+        tauri::async_runtime::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                if matches!(event, CommandEvent::Terminated(_)) {
                     stopped.store(true, Ordering::SeqCst);
+                }
+                let _ = tx.send(Step::Server(event)).await;
+            }
+            let _ = tx.send(Step::Gone).await;
+        });
+        after(&late, engine_start::READY_WAIT, Step::WaitOver);
+        let mut port: Option<u16> = None;
+        let mut tail = Tail::new(&token);
+        let mut ended: Option<Failure> = None;
+        while let Some(step) = steps.recv().await {
+            let (text, stdout) = match step {
+                Step::Server(CommandEvent::Stdout(bytes)) => (String::from_utf8_lossy(&bytes).into_owned(), true),
+                Step::Server(CommandEvent::Stderr(bytes)) => (String::from_utf8_lossy(&bytes).into_owned(), false),
+                Step::Server(CommandEvent::Terminated(payload)) => {
                     if handle.state::<Server>().quitting.load(Ordering::SeqCst) {
                         return;
                     }
-                    let detail = errors.last().cloned().unwrap_or_default();
-                    let text = if port.is_none() {
-                        format!("The formNET server stopped before it was ready.\n\n{detail}")
-                    } else {
-                        "The formNET server stopped unexpectedly. Open formNET again to continue; recordings are kept in memory only, so this one is gone.".to_string()
-                    };
-                    fail(&handle, text.trim());
+                    ended = Some(if port.is_some() { Failure::Lost } else { Failure::Stopped(payload.code) });
+                    after(&late, engine_start::EXIT_GRACE, Step::GraceOver);
+                    continue;
+                }
+                Step::Server(_) => continue,
+                Step::WaitOver if port.is_some() || ended.is_some() => continue,
+                Step::WaitOver => {
+                    if !handle.state::<Server>().quitting.load(Ordering::SeqCst) {
+                        fail(&handle, Failure::TimedOut, &tail);
+                    }
                     return;
                 }
-                _ => {}
+                Step::Gone | Step::GraceOver => match ended.take() {
+                    Some(failure) => {
+                        fail(&handle, failure, &tail);
+                        return;
+                    }
+                    None => continue,
+                },
+            };
+            for line in text.lines() {
+                if stdout && port.is_none() {
+                    if let Some(found) = ready_port(line) {
+                        port = Some(found);
+                        if let Err(err) = open_main(&handle, found, &token) {
+                            fail(&handle, Failure::Window(err.to_string()), &tail);
+                            return;
+                        }
+                        continue;
+                    }
+                }
+                tail.push(line);
             }
         }
     });
 }
 
-fn stop_server(handle: &AppHandle) {
+fn stop_server(handle: &AppHandle, wait: Duration) {
     let server = handle.state::<Server>();
     server.quitting.store(true, Ordering::SeqCst);
     let Some(child) = server.child.lock().unwrap().take() else {
@@ -271,14 +362,16 @@ fn stop_server(handle: &AppHandle) {
     let pid = child.pid();
     drop(child);
     let started = Instant::now();
-    while !server.stopped.load(Ordering::SeqCst) && started.elapsed() < STOP_WAIT {
+    while !server.stopped.load(Ordering::SeqCst) && started.elapsed() < wait {
         std::thread::sleep(Duration::from_millis(50));
     }
     if !server.stopped.load(Ordering::SeqCst) {
         #[cfg(unix)]
         let _ = std::process::Command::new("kill").args(["-KILL", &pid.to_string()]).status();
         #[cfg(windows)]
-        let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status();
+        if !win_job::end() {
+            let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status();
+        }
     }
 }
 
@@ -322,7 +415,7 @@ fn main() {
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
-            stop_server(handle);
+            stop_server(handle, STOP_WAIT);
         }
     });
 }
