@@ -218,6 +218,7 @@ func (p *Proxy) ruleExchange(w http.ResponseWriter, r *http.Request, o origin, p
 			return
 		}
 		out.Header = outHeader.Clone()
+		keepTE(out.Header, r.Header, r.Trailer, out)
 		if _, ok := out.Header["User-Agent"]; !ok {
 			out.Header["User-Agent"] = []string{""} // net/http would add its own otherwise; a removed one stays removed
 		}

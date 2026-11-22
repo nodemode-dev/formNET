@@ -79,7 +79,7 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, o origin
 
 // dialUpstream connects through the guard and, for https, opens TLS on top.
 func (p *Proxy) dialUpstream(ctx context.Context, o origin) (net.Conn, error) {
-	raw, err := p.guard.DialContext(ctx, "tcp", o.hostPort())
+	raw, err := p.dialOut(ctx, o.hostPort())
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (p *Proxy) relayUpgrade(w http.ResponseWriter, resp *http.Response, upstrea
 	res := newCapture(http.NoBody, 0).message(resp.Header, statusLine, 0)
 	f.Response = &res
 	f.Status = resp.StatusCode
-	f.Protocol = resp.Proto
+	f.Protocol, f.ServerProto = resp.Proto, resp.Proto
 	if err := resp.Write(client); err != nil {
 		f.Error = "handshake not delivered: " + err.Error()
 		p.finish(f.Completed(time.Now()))
@@ -127,7 +127,8 @@ func (p *Proxy) relayUpgrade(w http.ResponseWriter, resp *http.Response, upstrea
 	if upstreamReader.Buffered() > 0 {
 		upstreamSide = &readerConn{Conn: upstream, r: io.MultiReader(io.LimitReader(upstreamReader, int64(upstreamReader.Buffered())), upstream)}
 	}
-	sent, received := pipe(clientSide, upstreamSide, p.opts.TunnelIdle)
+	sent, received, msgs := p.relayFrames(clientSide, upstreamSide, f, resp.Header)
+	f.Messages = msgs
 	f.BytesSent = f.Request.HeaderBytes + sent
 	f.BytesReceived = res.HeaderBytes + received
 	p.finish(f.Completed(time.Now()))

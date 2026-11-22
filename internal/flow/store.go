@@ -134,6 +134,9 @@ func (s *Store) Update(f Flow) (Flow, bool) {
 
 func (s *Store) replaceLocked(old, now *Flow) {
 	now.Seq = old.Seq
+	if now.ClientPID == 0 && old.ClientPID != 0 && now.Client == old.Client {
+		now.ClientPID, now.ClientProcess = old.ClientPID, old.ClientProcess
+	}
 	s.bytes += captured(now) - captured(old)
 	s.byID[now.ID] = now
 }

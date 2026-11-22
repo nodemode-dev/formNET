@@ -212,9 +212,16 @@ func (h *HARWriter) Close() error {
 }
 
 func toEntry(f Flow, opt HAROptions) harEntry {
-	clientProto := f.ClientProtocol
+	clientProto := f.ClientProto
+	if clientProto == "" {
+		clientProto = f.ClientProtocol
+	}
 	if clientProto == "" {
 		clientProto = f.Protocol
+	}
+	serverProto := f.ServerProto
+	if serverProto == "" {
+		serverProto = f.Protocol
 	}
 	req := harRequest{
 		Method:      f.Method,
@@ -233,7 +240,7 @@ func toEntry(f Flow, opt HAROptions) harEntry {
 	res := harResponse{
 		Status:      f.Status,
 		StatusText:  statusText(f.Status),
-		HTTPVersion: f.Protocol,
+		HTTPVersion: serverProto,
 		Cookies:     []harNameValue{},
 		Headers:     []harNameValue{},
 		RedirectURL: "",
