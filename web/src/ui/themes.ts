@@ -13,7 +13,7 @@
 // Never call applyTheme() from a component's first render; that is a second
 // paint and the user sees both.
 
-export interface ThemeProfile { label: string; vars: Record<string, string>; light?: boolean; css?: string }
+export interface ThemeProfile { label: string; vars: Record<string, string>; light?: boolean; oled?: boolean; css?: string }
 
 export const THEMES: Record<string, ThemeProfile> = {
   // The target look (Phase 21, UI_SPEC.md): surfaces, text and the pasteboard measured from the owner's screenshots;
@@ -33,6 +33,7 @@ export const THEMES: Record<string, ThemeProfile> = {
   'rose': { label: 'Rose Noir', vars: { '--bg-primary': '#170b10', '--bg-secondary': '#211117', '--bg-tertiary': '#301a22', '--border-color': '#4d2b38', '--border-light': '#653a49', '--text-primary': '#f5e7ec', '--text-secondary': '#cfa5b3', '--text-muted': '#966b7b', '--canvas-bg': '#170b10', '--grid-color': 'rgba(255,190,215,0.05)', '--node-shadow': '0 6px 18px rgba(25,0,10,0.55)' } },
   'terminal': { label: 'Terminal Green', vars: { '--bg-primary': '#050d05', '--bg-secondary': '#0a140a', '--bg-tertiary': '#102010', '--border-color': '#1f3d1f', '--border-light': '#2b522b', '--text-primary': '#d8f5d8', '--text-secondary': '#8fce8f', '--text-muted': '#568a56', '--canvas-bg': '#050d05', '--grid-color': 'rgba(120,255,120,0.06)', '--node-shadow': '0 6px 18px rgba(0,10,0,0.6)' } },
   'contrast': { label: 'High Contrast', vars: { '--bg-primary': '#000000', '--bg-secondary': '#0a0a0a', '--bg-tertiary': '#161616', '--border-color': '#555555', '--border-light': '#777777', '--text-primary': '#ffffff', '--text-secondary': '#d8d8d8', '--text-muted': '#9a9a9a', '--canvas-bg': '#000000', '--grid-color': 'rgba(255,255,255,0.10)', '--node-shadow': '0 0 0 1px #666' } },
+  'amoled': { label: 'AMOLED Black', oled: true, vars: { '--bg-primary': '#000000', '--bg-secondary': '#000000', '--bg-tertiary': '#141414', '--bg-node': '#000000', '--border-color': '#262626', '--border-light': '#3a3a3a', '--text-primary': '#ededed', '--text-secondary': '#a6a6a6', '--text-muted': '#858585', '--canvas-bg': '#000000', '--grid-color': '#262626' } },
   // Skins of a look rather than a hue: the 90s grey with a teal pasteboard, and Duck's lavender with soft light panels.
   'nineties': { label: '90s', light: true, vars: { '--bg-primary': '#c0c0c0', '--bg-secondary': '#d4d0c8', '--bg-tertiary': '#b4b0a8', '--bg-node': '#d4d0c8', '--border-color': '#808080', '--border-light': '#ffffff', '--text-primary': '#000000', '--text-secondary': '#202020', '--text-muted': '#585858', '--canvas-bg': '#008080', '--grid-color': 'rgba(0,0,0,0.12)', '--node-shadow': '2px 2px 0 rgba(0,0,0,0.45)' } },
   'duck': { label: 'Duck', light: true, vars: { '--bg-primary': '#e9e4f7', '--bg-secondary': '#f4f1fc', '--bg-tertiary': '#d9d2ef', '--bg-node': '#f4f1fc', '--border-color': '#c7bde6', '--border-light': '#b3a6dc', '--text-primary': '#2b2540', '--text-secondary': '#4f4770', '--text-muted': '#7a7299', '--canvas-bg': '#e2dcf2', '--grid-color': 'rgba(90,70,150,0.10)', '--node-shadow': '0 5px 14px rgba(70,50,130,0.16)' } },
@@ -51,9 +52,11 @@ export const THEMES: Record<string, ThemeProfile> = {
 };
 
 export const DEFAULT_THEME = 'studio';
-export const DEFAULT_ACCENT = '#f97316';
+export const DEFAULT_ACCENT = '#8681dd';
 /** The redesign's first default accent, moved to orange by appearance 3 unless it was chosen on purpose. */
 export const OLD_DEFAULT_ACCENT = '#aba0d3';
+/** The family's orange, FormNET's default until appearance 4 moved a choice that still held it to FormNET's accent. */
+export const PREV_DEFAULT_ACCENT = '#f97316';
 export const DEFAULT_INTENSITY = 1;
 // the app persists UI settings under this key as JSON {theme, accentColor, ...}
 export const STORAGE_KEY = 'nodemode_ui_settings';
@@ -62,8 +65,10 @@ export interface ThemeChoice { theme: string; accentColor: string; intensity?: n
 
 /** The appearance generation: a choice saved before Studio Dark (Phase 21) lacks it and is set aside once, so the
  *  redesign reaches everyone. Generation 3 (1.48.1): the accent defaults to orange; a generation-2 choice keeps its
- *  theme and any accent chosen on purpose, the old lavender default becoming orange. index.html's boot script agrees. */
-export const APPEARANCE = 3;
+ *  theme and any accent chosen on purpose, the old lavender default becoming orange. Generation 4: the accent defaults to
+ *  FormNET's #8681dd; a generation-3 choice keeps its theme, intensity and any accent chosen on purpose, the orange default
+ *  becoming #8681dd. public/theme-boot.js agrees. */
+export const APPEARANCE = 4;
 const clampIntensity = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1.5, Math.max(0, v)) : DEFAULT_INTENSITY);
 
 /** `?no-skin` on the page address (the desktop app's `--no-skin` flag adds it) starts with the default look and keeps the saved choice until a theme is picked. */
@@ -78,7 +83,8 @@ export function readChoice(): ThemeChoice {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<ThemeChoice> & { appearance?: number };
       if (saved.appearance === APPEARANCE) return { theme: saved.theme || DEFAULT_THEME, accentColor: saved.accentColor || DEFAULT_ACCENT, intensity: clampIntensity(saved.intensity) };
-      if (saved.appearance === 2) return { theme: saved.theme || DEFAULT_THEME, accentColor: !saved.accentColor || saved.accentColor === OLD_DEFAULT_ACCENT ? DEFAULT_ACCENT : saved.accentColor, intensity: DEFAULT_INTENSITY };
+      if (saved.appearance === 3) return { theme: saved.theme || DEFAULT_THEME, accentColor: !saved.accentColor || saved.accentColor === PREV_DEFAULT_ACCENT ? DEFAULT_ACCENT : saved.accentColor, intensity: clampIntensity(saved.intensity) };
+      if (saved.appearance === 2) return { theme: saved.theme || DEFAULT_THEME, accentColor: !saved.accentColor || saved.accentColor === OLD_DEFAULT_ACCENT || saved.accentColor === PREV_DEFAULT_ACCENT ? DEFAULT_ACCENT : saved.accentColor, intensity: DEFAULT_INTENSITY };
     }
   } catch (e) {
     console.error('[theme] read failed:', e);
@@ -96,6 +102,8 @@ export function saveChoice(choice: ThemeChoice): void {
   }
 }
 
+let lastVars = new Set<string>();
+
 /** Apply a profile and accent to the document. Mirrors applySettings():
  * profile vars first, then the derived --bg-node and --shadow-lg the
  * profiles do not declare, then the accent and its dim variant. Idempotent:
@@ -104,8 +112,11 @@ export function saveChoice(choice: ThemeChoice): void {
 export function applyTheme(choice: ThemeChoice = readChoice()): void {
   const root = document.documentElement;
   const theme = THEMES[choice.theme] || THEMES[DEFAULT_THEME];
+  for (const k of lastVars) if (!(k in theme.vars)) root.style.removeProperty(k);
+  lastVars = new Set(Object.keys(theme.vars));
   for (const [k, v] of Object.entries(theme.vars)) root.style.setProperty(k, v);
   document.body.classList.toggle('theme-light', !!theme.light);
+  if (theme.oled) { if (!root.hasAttribute('data-oled')) root.setAttribute('data-oled', ''); } else if (root.hasAttribute('data-oled')) root.removeAttribute('data-oled');
   root.style.setProperty('--bg-node', theme.vars['--bg-node'] || theme.vars['--bg-secondary']);
   root.style.setProperty('--shadow-lg', theme.light
     ? '0 4px 14px rgba(96, 90, 70, 0.16)'
