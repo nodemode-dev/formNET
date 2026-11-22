@@ -28,6 +28,7 @@ release: web
 check:
 	gofmt -l . | (! grep .)
 	go vet ./...
+	go run ./cmd/formnet agents check
 	test -d web/node_modules || ./web/oc_install
 	cd web && npm run typecheck
 
