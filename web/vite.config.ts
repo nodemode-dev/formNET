@@ -8,6 +8,8 @@ export default defineConfig({
   build: { outDir: "dist", emptyOutDir: false, sourcemap: false, target: "es2022", assetsInlineLimit: 0 },
   server: {
     port: 5176,
+    host: false,
+    strictPort: true,
     proxy: {
       "/api": { target: "http://127.0.0.1:8760", changeOrigin: false },
       "/ca.pem": { target: "http://127.0.0.1:8760", changeOrigin: false },
