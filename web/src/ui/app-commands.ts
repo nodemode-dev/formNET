@@ -18,6 +18,7 @@ export interface CommandDeps {
   home: { show(): void; dismiss(): void };
   focusFilter: () => void;
   captionButtons: { sync(): void };
+  dock: { isOpen(): boolean; toggle(): void; newTerminal(): Promise<void> };
 }
 
 const isTauri = (): boolean => '__TAURI_INTERNALS__' in window;
@@ -91,6 +92,8 @@ export function registerCommands(d: CommandDeps): Commands {
     { id: 'view-setup', label: 'Setup', keys: ['Mod+4'], run: view('setup') },
     { id: 'home', label: 'Home', run: () => d.home.show() },
     { id: 'live', label: 'Live', checked: () => st.get().live, run: () => st.update((s) => ({ live: !s.live })) },
+    { id: 'terminal', label: 'Terminal', keys: ['Mod+J'], checked: () => d.dock.isOpen(), run: () => d.dock.toggle() },
+    { id: 'terminal-new', label: 'New Terminal', run: () => void d.dock.newTerminal() },
     { id: 'zoom-in', label: 'Zoom In', keys: ['Mod+='], enabled: () => uiZoom() < SCALES[SCALES.length - 1], run: () => stepZoom(1) },
     { id: 'zoom-out', label: 'Zoom Out', keys: ['Mod+-'], enabled: () => uiZoom() > SCALES[0], run: () => stepZoom(-1) },
     { id: 'zoom-reset', label: 'Actual Size', keys: ['Mod+0'], enabled: () => uiZoom() !== 1, run: () => setUiScale('1') },

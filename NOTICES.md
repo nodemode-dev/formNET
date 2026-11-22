@@ -11,6 +11,8 @@ Built by Vite into `web/dist`, embedded in the formnet server and shown in the d
 | @fontsource/inter (Inter typeface) | 5.3.0 | OFL-1.1 | https://github.com/fontsource/font-files (fonts/google/inter) | font files for weights 400, 500 and 600 |
 | @fontsource/jetbrains-mono (JetBrains Mono typeface) | 5.3.0 | OFL-1.1 | https://github.com/fontsource/font-files (fonts/google/jetbrains-mono) | font files for weights 400 and 700 |
 | @tauri-apps/api | 2.12.5 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | the page's bridge to the desktop shell |
+| @xterm/xterm | 6.0.0 | MIT | https://github.com/xtermjs/xterm.js | the terminal dock's emulator and its stylesheet; Copyright (c) 2017-2019 The xterm.js authors, (c) 2014-2016 SourceLair Private Company, (c) 2012-2013 Christopher Jeffrey |
+| @xterm/addon-fit | 0.11.0 | MIT | https://github.com/xtermjs/xterm.js (addons/addon-fit) | sizes the terminal dock's emulator to its panel; Copyright (c) 2019 The xterm.js authors |
 
 The SIL Open Font License 1.1 text is at https://openfontlicense.org.
 

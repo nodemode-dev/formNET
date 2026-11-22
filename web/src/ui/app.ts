@@ -7,9 +7,11 @@ import { machineView } from './machine-view.ts';
 import { setupView } from './setup-view.ts';
 import { applyUiZoom, registerCommands } from './app-commands';
 import { menus } from './app-menus';
+import { Dock } from '../dock/dock';
 import { CaptionButtons } from './caption-buttons';
 import { comboOf } from './commands';
 import { anyDialogOpen } from './dialogs';
+import { formnetDock } from './dock-adapter';
 import { mountOnce, q, revealApp, setClass, setDisabled, setTitle } from './dom';
 import { HomeScreen } from './home';
 import { icon } from './icons';
@@ -70,15 +72,22 @@ export function startApp(store: Store, onLost: () => void): void {
   const captionButtons = new CaptionButtons(q(root, '.cv-titlebar'), () => { try { return localStorage.getItem('formnet.customTitleBar') === '1'; } catch { return false; } });
   const onPrefs = (p: Prefs): void => { applyUiPrefs(p); store.update({ maxRows: p.maxRows, machineSort: p.machineSort }); home.sync(); };
   const settings = new SettingsDialog({ store, onPrefs });
-  const commands = registerCommands({ store, settings, home, focusFilter: () => options.focus(), captionButtons });
-  new TitleTools(q(root, '.cv-titlebar'), commands);
+  // The family's terminal dock: built once, hidden, its row in the grid above the status bar (styles/terminal.css).
+  const dock: Dock<'antigravity'> = new Dock(formnetDock({ openSettings: () => settings.show('Agents and Scripts'), layerOpen: anyDialogOpen, changed: () => dock.refresh() }));
+  dock.mount(root, q(root, '.cv-status'));
+  const commands = registerCommands({ store, settings, home, focusFilter: () => options.focus(), captionButtons, dock });
+  const titleTools = new TitleTools(q(root, '.cv-titlebar'), commands, () => void dock.toggleKind('shell'));
   const menubar = new MenuBar(q(root, '.cv-menubar'), commands, menus());
+  let native: NativeMenus | null = null;
   if (wantsNativeMenus()) {
-    const native = new NativeMenus(commands, menus);
-    void native.build().catch(() => undefined);
-    store.subscribe(() => native.refresh());
-    onLanguage(() => { void native.build().catch(() => undefined); });
+    const menu = new NativeMenus(commands, menus);
+    native = menu;
+    void menu.build().catch(() => undefined);
+    store.subscribe(() => menu.refresh());
+    onLanguage(() => { void menu.build().catch(() => undefined); });
   }
+  dock.onTab = () => { titleTools.syncDock(dock.isShowing('shell')); native?.refresh(); };
+  dock.onTab();
   // The proxy address is what the window "has open": it reads at the left of the title row where the menus are the system's.
   const doc = q(root, '.cv-tb-doc');
   const paintDoc = (): void => { const p = store.get().status?.proxy; const text = p ? t('Proxy {addr}').replace('{addr}', p.addr) : ''; if (doc.textContent !== text) doc.textContent = text; };
