@@ -1,21 +1,23 @@
 import type { Commands } from './commands';
-import { el, setHidden, setText } from './dom';
+import { el, setClass, setHidden, setText } from './dom';
 import { t } from './i18n';
 import { icon } from './icons';
 import { readChoice, setTheme } from './themes';
 
 /** The title bar's right-hand tools, as the family's (formvis titlebar-tools.ts, without the workspaces, the lock and
- *  the terminal buttons FormNET has no use for): a theme toggle (Studio Dark and Light) and a search that finds and
- *  runs any enabled command by name, with its shortcut shown. */
+ *  the Claude Code button FormNET has no use for): a theme toggle (Studio Dark and Light), a search that finds and
+ *  runs any enabled command by name, with its shortcut shown, and Show Terminal, lit while the dock shows a shell. */
 export class TitleTools {
   readonly root = el('<div class="cv-title-tools"></div>');
   private readonly results = el('<div class="cv-search-results" role="listbox"></div>');
   private readonly pop = el(`<div class="cv-search-pop" hidden><input class="cv-search-input" type="search" placeholder="${t('Search commands')}" aria-label="${t('Search commands')}"></div>`);
+  private readonly shell = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="${t('Show Terminal')}" aria-label="${t('Show Terminal')}" aria-pressed="false">${icon('terminal', 16)}</button>`);
   private picked = 0;
 
-  constructor(host: HTMLElement, private readonly commands: Commands) {
+  constructor(host: HTMLElement, private readonly commands: Commands, terminal: () => void) {
     const theme = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="${t('Light or dark')}" aria-label="${t('Light or dark')}"></button>`);
     const search = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="${t('Search commands')}" aria-label="${t('Search commands')}">${icon('search', 16)}</button>`);
+    this.shell.addEventListener('click', terminal);
     const syncTheme = (): void => {
       const light = readChoice().theme === 'light';
       if (!theme.firstElementChild) theme.innerHTML = `<span class="cv-tt-sun">${icon('sun', 16)}</span><span class="cv-tt-moon">${icon('moon', 16)}</span>`;
@@ -37,8 +39,13 @@ export class TitleTools {
       if (e.key === 'Enter') { const b = this.results.children[this.picked] as HTMLElement | undefined; if (b) b.click(); }
     });
     document.addEventListener('pointerdown', (e) => { if (!this.pop.hidden && !this.pop.contains(e.target as Node) && !search.contains(e.target as Node)) this.close(); });
-    this.root.append(theme, search, this.pop);
+    this.root.append(theme, search, this.shell, this.pop);
     host.appendChild(this.root);
+  }
+
+  syncDock(on: boolean): void {
+    setClass(this.shell, 'is-on', on);
+    if (this.shell.getAttribute('aria-pressed') !== String(on)) this.shell.setAttribute('aria-pressed', String(on));
   }
 
   open(): void {
