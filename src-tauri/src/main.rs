@@ -24,7 +24,7 @@ use tauri_plugin_shell::ShellExt;
 
 const READY: &str = "formnet desktop ready http://127.0.0.1:";
 const PREFERRED_ADDR: &str = "127.0.0.1:8760";
-const FALLBACK_LOGICAL: (f64, f64) = (1280.0, 840.0);
+const FALLBACK_LOGICAL: (f64, f64) = (1323.0, 860.0);
 const MIN_LOGICAL: (f64, f64) = (980.0, 640.0);
 const SCREEN_FRACTION: f64 = 0.9;
 const STOP_WAIT: Duration = Duration::from_secs(8);
@@ -117,9 +117,12 @@ fn close_splash(handle: &AppHandle) {
 }
 
 fn focus_main(handle: &AppHandle) {
-    if let Some(window) = handle.get_webview_window("main") {
+    let window = handle
+        .get_webview_window("main")
+        .filter(|_| reveal::revealed())
+        .or_else(|| handle.get_webview_window("splash"));
+    if let Some(window) = window {
         let _ = window.unminimize();
-        let _ = window.show();
         let _ = window.set_focus();
     }
 }
@@ -137,9 +140,11 @@ fn allow_page(handle: &AppHandle, port: u16) -> tauri::Result<()> {
 
 fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
     allow_page(handle, port)?;
-    let url: Url = format!("http://127.0.0.1:{port}/?token={token}")
-        .parse()
-        .expect("loopback url");
+    let origin = format!("http://127.0.0.1:{port}");
+    let url: Url = format!("{origin}/").parse().expect("loopback url");
+    let token_script = format!(
+        "if (window.location.origin === {origin:?}) {{ try {{ window.sessionStorage.setItem(\"formnet.token\", {token:?}); }} catch (e) {{}} }}"
+    );
     let (width, height) = handle
         .primary_monitor()
         .ok()
@@ -162,6 +167,8 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
     let finished = handle.clone();
     let builder = WebviewWindowBuilder::new(handle, "main", WebviewUrl::External(url))
         .title("FormNET")
+        .initialization_script(token_script)
+        .accept_first_mouse(true)
         .visible(reveal::BUILD_VISIBLE)
         .background_color(reveal::BACKGROUND)
         .inner_size(width, height)
@@ -222,6 +229,7 @@ fn open_main(handle: &AppHandle, port: u16, token: &str) -> tauri::Result<()> {
 fn fail(handle: &AppHandle, failure: Failure, tail: &Tail) {
     let text = engine_start::message(&failure, tail);
     eprintln!("formnet desktop: {text}");
+    reveal::hold_splash();
     if let Some(splash) = handle.get_webview_window("splash") {
         let _ = splash.hide();
     }
@@ -388,6 +396,11 @@ fn main() {
             quitting: AtomicBool::new(false),
         })
         .manage(zoom::Zoom(Mutex::new(1.0)))
+        .on_page_load(|webview, payload| {
+            if webview.label() == "splash" && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                reveal::splash_part(webview.app_handle());
+            }
+        })
         .on_window_event(|window, event| {
             if window.label() == "main"
                 && matches!(
