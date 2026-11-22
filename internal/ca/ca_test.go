@@ -161,6 +161,9 @@ func TestTrustInstructionsPerOS(t *testing.T) {
 		if hint == "" || untrust == "" {
 			t.Errorf("%s: hint %q untrust %q", goos, hint, untrust)
 		}
+		if goos == "windows" {
+			want = `"/data dir/it's/ca.pem"`
+		}
 		if !strings.Contains(cmd, want) {
 			t.Errorf("%s: path not quoted in %q", goos, cmd)
 		}
@@ -172,7 +175,7 @@ func TestTrustInstructionsPerOS(t *testing.T) {
 	if !strings.Contains(darwin, "-p ssl") || !strings.Contains(darwin, "login.keychain-db") || !strings.Contains(darwinUntrust, "delete-certificate -c 'formnet root on box'") {
 		t.Errorf("darwin: %q / %q", darwin, darwinUntrust)
 	}
-	if _, _, u := trustInstructionsFor("windows", path, "formnet root on box"); !strings.Contains(u, "-delstore -user Root 'formnet root on box'") {
+	if _, _, u := trustInstructionsFor("windows", path, "formnet root on box"); !strings.Contains(u, `-delstore -user Root "formnet root on box"`) {
 		t.Errorf("windows untrust: %q", u)
 	}
 	if cmd, hint, _ := trustInstructionsFor("plan9", path, "x"); cmd != "" || hint == "" {
