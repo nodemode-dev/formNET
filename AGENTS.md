@@ -4,7 +4,7 @@ Guidance for Codex, Cursor and other agents that read `AGENTS.md`. Claude Code r
 
 ## What this repo is
 
-formNET shows what programs on a computer actually send and receive. Go 1.26 server under `cmd/` and `internal/`, a TypeScript client under `web/` (Vite, no UI framework) embedded into the binary, and a Tauri 2 window under `src-tauri/` for the desktop app. See `CLAUDE.md` for the package map.
+FormNET shows what programs on a computer actually send and receive. Go 1.26 server under `cmd/` and `internal/`, a TypeScript client under `web/` (Vite, no UI framework) embedded into the binary, and a Tauri 2 window under `src-tauri/` for the desktop app. See `CLAUDE.md` for the package map.
 
 ## Build and check
 
