@@ -2,8 +2,9 @@
 //
 // Routes (all under the configured loopback address):
 //
-//	GET  /healthz                  liveness: {status, product, version}
-//	GET  /api/status               proxy, CA, flow count and machine view in one body
+//	GET  /healthz                  liveness: {status, product, version, proxy_addr, proxy_listening}; no token
+//	GET  /api/status               proxy, CA, flow count, machine view and start notices in one body
+//	POST /api/quit                 stop this run cleanly (a newer formnet replacing it asks this)
 //	GET  /api/flows                flows without bodies; filters: host, domain, kind, client, q, since, pending, limit
 //	GET  /api/flows/{id}           one flow with its captured bodies
 //	POST /api/flows/clear          forget every flow
@@ -84,6 +85,8 @@ type Deps struct {
 	Machine MachineSource
 	Dist    fs.FS
 	Log     *slog.Logger
+	Notices []string // what the person should know about this start, such as a moved port
+	Quit    func()   // stops the run; nil leaves /api/quit unanswered
 }
 
 // Handler builds the API and client handler. It panics without a token,
@@ -110,6 +113,9 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /ca.pem", s.caPEM)
 	mux.HandleFunc("GET /api/export/har", s.exportHAR)
 	mux.HandleFunc("GET /api/stream", s.stream)
+	if d.Quit != nil {
+		mux.HandleFunc("POST /api/quit", s.quit)
+	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "no such route") })
 	mux.Handle("/", s.client())
 	return s.guard(mux)
@@ -228,13 +234,25 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 }
 
 type healthBody struct {
-	Status  string `json:"status"`
-	Product string `json:"product"`
-	Version string `json:"version"`
+	Status         string `json:"status"`
+	Product        string `json:"product"`
+	Version        string `json:"version"`
+	ProxyAddr      string `json:"proxy_addr"`
+	ProxyListening bool   `json:"proxy_listening"`
 }
 
 func (s *handler) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, healthBody{Status: "ok", Product: app.Product, Version: app.Version})
+	px := s.Proxy.Status()
+	writeJSON(w, http.StatusOK, healthBody{Status: "ok", Product: app.Product, Version: app.Version, ProxyAddr: px.Addr, ProxyListening: px.Running})
+}
+
+func (s *handler) quit(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusAccepted, map[string]any{"stopping": true})
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	s.Log.Info("asked to stop by another formnet")
+	go s.Quit()
 }
 
 type statusBody struct {
@@ -249,6 +267,7 @@ type statusBody struct {
 	Proxy   proxy.Status  `json:"proxy"`
 	CA      ca.Info       `json:"ca"`
 	Machine machineStatus `json:"machine"`
+	Notices []string      `json:"notices"`
 	Now     time.Time     `json:"now"`
 }
 
@@ -276,6 +295,7 @@ func (s *handler) status(w http.ResponseWriter, r *http.Request) {
 		Proxy:   s.Proxy.Status(),
 		CA:      s.CA.Info(),
 		Machine: machineStatus{Supported: snap.Supported, Source: snap.Source, Taken: snap.Taken, Processes: len(snap.Processes), Connections: len(snap.Connections), Error: snap.Error},
+		Notices: append([]string{}, s.Notices...),
 		Now:     time.Now(),
 	})
 }
