@@ -65,10 +65,32 @@ export function patchList<T>(container: HTMLElement, items: T[], opts: PatchList
       node = opts.create(item);
       node.dataset.key = k;
     }
-    if (node !== cursor) container.insertBefore(node, cursor);
+    if (node !== cursor) moveInto(container, node, cursor);
     else cursor = cursor.nextElementSibling;
   }
   for (const [k, node] of byKey) if (!seen.has(k)) node.remove();
+}
+
+/** `items` in the order `previous` named their keys; keys not named there follow, in the order they came. */
+export function keepOrder<T>(items: readonly T[], key: (item: T) => string, previous: readonly string[]): T[] {
+  const at = new Map(previous.map((k, i) => [k, i] as const));
+  const known: T[] = [];
+  const fresh: T[] = [];
+  for (const it of items) (at.has(key(it)) ? known : fresh).push(it);
+  known.sort((a, b) => (at.get(key(a)) ?? 0) - (at.get(key(b)) ?? 0));
+  return [...known, ...fresh];
+}
+
+type MovingParent = HTMLElement & { moveBefore?: (node: Node, child: Node | null) => void };
+
+/** Puts `node` before `ref`. A node already in the page moves with moveBefore where the engine has it, so focus,
+ *  selection and running animations stay; elsewhere, and for a new node, insertBefore. */
+export function moveInto(container: HTMLElement, node: HTMLElement, ref: Element | null): void {
+  const parent = container as MovingParent;
+  if (parent.moveBefore && node.isConnected && container.isConnected) {
+    try { parent.moveBefore(node, ref); return; } catch { /* insertBefore below */ }
+  }
+  container.insertBefore(node, ref);
 }
 
 /** Replace an image's source without a blank frame: decode off-screen, then
@@ -149,7 +171,7 @@ export function setHidden(node: HTMLElement, hidden: boolean): void { if (node.h
 export function setDisabled(node: HTMLButtonElement | HTMLInputElement | HTMLSelectElement, disabled: boolean): void { if (node.disabled !== disabled) node.disabled = disabled; }
 export function setTitle(node: HTMLElement, title: string): void { if (node.title !== title) node.title = title; }
 export function setStyleVar(node: HTMLElement, name: string, value: string): void { if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value); }
-export function setValue(node: HTMLInputElement | HTMLSelectElement, value: string): void { if (node.value !== value && document.activeElement !== node) node.value = value; }
+export function setValue(node: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): void { if (node.value !== value && document.activeElement !== node) node.value = value; }
 export function setChecked(node: HTMLInputElement, on: boolean): void { if (node.checked !== on) node.checked = on; }
 export function setHtml(node: Element, html: string, key: string): void {
   const n = node as HTMLElement;

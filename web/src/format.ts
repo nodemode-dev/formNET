@@ -104,6 +104,7 @@ export function pathWithQuery(path: string, query: string): string {
 export function kindLabel(kind: string): string {
   if (kind === "tunnel") return "tunnel";
   if (kind === "websocket") return "ws";
+  if (kind === "refused") return "refused";
   return "";
 }
 
