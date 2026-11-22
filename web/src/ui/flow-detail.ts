@@ -4,6 +4,8 @@ import { bytes, dateTime, isImageType, isJSONType, isTextType, millis, prettyJSO
 import type { State, Store } from "../state.ts";
 import type { Body, FlowDetail, Message } from "../types.ts";
 import { patchList, setClass, setHidden, setText, setTitle, swapMedia } from "./dom";
+import { onLanguage, t } from "./i18n";
+import { icon } from "./icons";
 import { toast } from "./toast";
 
 type Tab = "summary" | "request" | "response" | "timing";
@@ -27,25 +29,26 @@ export function flowDetail(store: Store): HTMLElement {
   let current: FlowDetail | null = null;
   let loadedFor = "";
   const title = h("div", { class: "detail-title mono" });
-  const tabBar = h("div", { class: "subtabs", role: "tablist" });
-  const loading = h("p", { class: "dim" }, "Loading");
+  const tabBar = h("div", { class: "cv-seg", role: "tablist", "aria-label": t("Flow details") });
+  const loading = h("p", { class: "dim" }, t("Loading"));
   const panes: Record<Tab, Pane> = {
     summary: summaryPane(store),
     request: sidePane("Request", false),
     response: sidePane("Response", true),
     timing: timingPane(),
   };
-  const body = h("div", { class: "detail-body" }, loading, ...tabs.map((t) => panes[t.id].el));
-  const closeBtn = h("button", { type: "button", class: "btn btn-small", "aria-label": "Close details", onClick: () => store.update({ selectedId: null }) }, "Close");
-  const root = h("aside", { class: "detail", "aria-label": "Flow details" }, h("div", { class: "detail-head" }, title, closeBtn), tabBar, body);
+  const body = h("div", { class: "detail-body" }, loading, ...tabs.map((x) => panes[x.id].el));
+  const closeBtn = h("button", { type: "button", class: "cv-icon-btn", title: t("Close details"), "aria-label": t("Close details"), onClick: () => store.update({ selectedId: null }) });
+  closeBtn.innerHTML = icon("close", 16);
+  const root = h("aside", { class: "detail", "aria-label": t("Flow details") }, h("div", { class: "detail-head" }, title, closeBtn), h("div", { class: "detail-tabs" }, tabBar), body);
   root.hidden = true;
 
-  for (const t of tabs) {
+  for (const x of tabs) {
     tabBar.appendChild(
-      h("button", { type: "button", class: "subtab", role: "tab", "data-tab": t.id, onClick: () => {
-        tab = t.id;
+      h("button", { type: "button", role: "tab", "data-tab": x.id, onClick: () => {
+        tab = x.id;
         paint();
-      } }, t.label),
+      } }, t(x.label)),
     );
   }
 
@@ -56,14 +59,14 @@ export function flowDetail(store: Store): HTMLElement {
   const paint = () => {
     for (const b of tabBar.children) {
       const on = (b as HTMLElement).dataset["tab"] === tab;
-      setClass(b, "on", on);
+      setClass(b, "is-on", on);
       if (b.getAttribute("aria-selected") !== String(on)) b.setAttribute("aria-selected", String(on));
     }
     setHidden(loading, !!current);
-    for (const t of tabs) setHidden(panes[t.id].el, !current || t.id !== tab);
+    for (const x of tabs) setHidden(panes[x.id].el, !current || x.id !== tab);
     if (!current) return;
     setText(title, `${current.method} ${current.url}`);
-    for (const t of tabs) panes[t.id].patch(current);
+    for (const x of tabs) panes[x.id].patch(current);
   };
 
   const load = (id: string, version: string) => {
@@ -80,7 +83,7 @@ export function flowDetail(store: Store): HTMLElement {
       })
       .catch((err: Error) => {
         if (loadedFor === key) loadedFor = "";
-        if (store.get().selectedId === id) store.update({ notice: `Could not load the flow: ${err.message}` });
+        if (store.get().selectedId === id) store.update({ notice: t("Could not load the flow: {error}").replace("{error}", err.message) });
       });
   };
 
@@ -104,6 +107,7 @@ export function flowDetail(store: Store): HTMLElement {
     load(id, f.pending ? `${f.seq}` : `${f.seq}:done`);
   };
   store.subscribe(render);
+  onLanguage(() => { if (current) paint(); });
   return root;
 }
 
@@ -111,38 +115,39 @@ export function flowDetail(store: Store): HTMLElement {
  *  own line and nothing below it moves. */
 function kv(labels: string[]): { el: HTMLElement; set: (values: (string | number | undefined | null)[]) => void } {
   const dds = labels.map(() => h("dd", { class: "mono" }));
-  const dl = h("dl", { class: "kv" }, ...labels.flatMap((k, i) => [h("dt", {}, k), dds[i] as HTMLElement]));
+  const dl = h("dl", { class: "kv" }, ...labels.flatMap((k, i) => [h("dt", {}, t(k)), dds[i] as HTMLElement]));
   return { el: dl, set: (values) => dds.forEach((dd, i) => setText(dd, values[i] === undefined || values[i] === null ? "" : String(values[i]))) };
 }
 
 function summaryPane(store: Store): Pane {
   let f: FlowDetail | null = null;
-  const odd = h("span", { class: "warn small" }, "method contains unusual characters");
+  const odd = h("span", { class: "warn small" }, t("method contains unusual characters"));
   const rows = kv(["Kind", "Status", "Protocol", "Started", "Duration", "Client", "Host", "TLS", "Sent", "Received", "Request type", "Response type"]);
   const refusedError = h("p", { class: "st-error mono" });
-  const addBtn = h("button", { type: "button", class: "btn", onClick: () => { if (f) addToPassthrough(store, f.host); } });
+  const addBtn = h("button", { type: "button", class: "cv-btn", onClick: () => { if (f) addToPassthrough(store, f.host); } });
   const refused = h(
     "div",
     { class: "refused" },
-    h("h3", {}, "Certificate refused"),
+    h("h3", {}, t("Certificate refused")),
     refusedError,
-    h("p", {}, "The program does not accept FormNET's certificate: it pins its own, or this computer does not trust the root."),
-    h("div", { class: "row" }, addBtn),
+    h("p", {}, t("The program does not accept FormNET's certificate: it pins its own, or this computer does not trust the root.")),
+    h("div", { class: "cv-improve" }, addBtn),
   );
-  const el = h("div", {}, h("div", { class: "row" }, copyButton("Copy as curl", () => (f ? asCurl(f) : "")), copyButton("Copy URL", () => f?.url ?? ""), odd), rows.el, refused);
+  const ghost = "cv-btn cv-btn-ghost";
+  const el = h("div", {}, h("div", { class: "cv-improve" }, copyButton("Copy as curl", () => (f ? asCurl(f) : ""), ghost), copyButton("Copy URL", () => f?.url ?? "", ghost), odd), rows.el, refused);
   return {
     el,
     patch: (next) => {
       f = next;
-      const tls = f.tls ? `${f.tls.version} ${f.tls.cipher}${f.tls.intercepted ? "" : " (not opened)"}` : "";
+      const tls = !f.tls ? "" : f.tls.intercepted ? `${f.tls.version} ${f.tls.cipher}` : t("{version} {cipher} (not opened)").replace("{version}", f.tls.version).replace("{cipher}", f.tls.cipher);
       setHidden(odd, plainMethod.test(f.method));
       rows.set([
         f.kind,
-        f.error ? `error: ${f.error}` : f.status || (f.pending ? "pending" : ""),
+        f.error ? t("error: {error}").replace("{error}", f.error) : f.status || (f.pending ? t("pending") : ""),
         f.protocol,
         dateTime(f.start),
-        f.pending ? "pending" : millis(f.duration_ms),
-        f.client_process ? `${f.client_process} (pid ${f.client_pid ?? "?"}) from ${f.client}` : f.client,
+        f.pending ? t("pending") : millis(f.duration_ms),
+        f.client_process ? t("{process} (pid {pid}) from {client}").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")).replace("{client}", f.client) : f.client,
         `${f.host}${f.port ? `:${f.port}` : ""}`,
         tls,
         bytes(f.bytes_sent),
@@ -152,7 +157,7 @@ function summaryPane(store: Store): Pane {
       ]);
       setHidden(refused, f.kind !== "refused");
       setText(refusedError, f.error ?? "");
-      setText(addBtn, `Add ${f.host} to passthrough`);
+      setText(addBtn, t("Add {host} to passthrough").replace("{host}", f.host));
     },
   };
 }
@@ -163,11 +168,11 @@ function addToPassthrough(store: Store, host: string): void {
     .then((p) => {
       const list = p.passthrough ?? [];
       if (list.includes(host)) {
-        toast(`${host} is already in the passthrough list.`);
+        toast(t("{host} is already in the passthrough list.").replace("{host}", host));
         return;
       }
       return api.updateProxy({ passthrough: [...list, host] }).then(() => {
-        toast(`Added ${host} to passthrough: FormNET tunnels it from the next connection and only counts it.`);
+        toast(t("Added {host} to passthrough: FormNET tunnels it from the next connection and only counts it.").replace("{host}", host));
         api.status().then((status) => store.update({ status })).catch(() => undefined);
       });
     })
@@ -176,28 +181,34 @@ function addToPassthrough(store: Store, host: string): void {
 
 /** One side of the exchange. The response side keeps room for its headers and body from the start, so a pending flow
  *  that completes fills the reserved boxes instead of pushing the pane's content down. */
+const SIDE_TEXT = {
+  Request: { headers: "Request headers", body: "Request body", image: "request image" },
+  Response: { headers: "Response headers", body: "Response body", image: "response image" },
+} as const;
+
 function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
   let text = "";
   let shownBody = "";
+  const words = SIDE_TEXT[label];
   const headSize = h("span", { class: "dim" });
   const bodySize = h("span", { class: "dim" });
   const waiting = h("p", { class: "dim" });
-  const none = h("p", { class: "dim" }, "none");
+  const none = h("p", { class: "dim" }, t("none"));
   const list = h("dl", { class: "kv headers" });
   const enc = h("p", { class: "small" });
   const trunc = h("p", { class: "warn" });
   const empty = h("p", { class: "dim" });
-  const img = h("img", { class: "preview", alt: `${label.toLowerCase()} image` }) as HTMLImageElement;
-  const copyRow = h("div", { class: "row" }, copyButton("Copy body", () => text));
+  const img = h("img", { class: "preview", alt: t(words.image) }) as HTMLImageElement;
+  const copyRow = h("div", { class: "cv-improve" }, copyButton("Copy body", () => text));
   const pre = h("pre", { class: "body mono" });
   const binary = h("p", { class: "dim" });
   for (const n of [none, enc, trunc, empty, img, copyRow, pre, binary]) n.hidden = true;
   const el = h(
     "div",
     {},
-    h("h3", {}, `${label} headers`, headSize),
+    h("h3", {}, t(words.headers), headSize),
     h("div", { class: reserve ? "reserve-headers" : "" }, waiting, none, list),
-    h("h3", {}, `${label} body`, bodySize),
+    h("h3", {}, t(words.body), bodySize),
     h("div", { class: reserve ? "reserve-body" : "" }, enc, trunc, empty, img, copyRow, pre, binary),
   );
   return {
@@ -205,7 +216,7 @@ function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
     patch: (f) => {
       const m = label === "Request" ? f.request : f.response;
       const b = label === "Request" ? f.request_body : f.response_body;
-      setText(waiting, m ? "" : f.pending ? "No response yet." : f.error ? `Failed: ${f.error}` : "No response was recorded.");
+      setText(waiting, m ? "" : f.pending ? t("No response yet.") : f.error ? t("Failed: {error}").replace("{error}", f.error) : t("No response was recorded."));
       setHidden(waiting, !!m);
       setText(headSize, m ? ` ${bytes(m.header_bytes)}` : "");
       const hs = m?.headers ?? [];
@@ -224,14 +235,14 @@ function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
     const has = !!m && !!b && b.bytes > 0;
     const image = has && !!b?.base64 && isImageType(m?.content_type);
     const isText = has && !image && b?.text !== undefined;
-    setText(empty, !m ? "" : m.body_bytes > 0 ? `${bytes(m.body_bytes)} not captured` : "empty");
+    setText(empty, !m ? "" : m.body_bytes > 0 ? t("{size} not captured").replace("{size}", bytes(m.body_bytes)) : t("empty"));
     setHidden(empty, !m || has);
     const encoding = has ? b?.encoding ?? "" : "";
-    setText(enc, !encoding ? "" : b?.decoded ? `${encoding}, decoded` : `${encoding}, not decoded`);
+    setText(enc, !encoding ? "" : t(b?.decoded ? "{encoding}, decoded" : "{encoding}, not decoded").replace("{encoding}", encoding));
     setClass(enc, "warn", !!encoding && !b?.decoded);
     setClass(enc, "dim", !!encoding && !!b?.decoded);
     setHidden(enc, !encoding);
-    setText(trunc, has && b?.truncated && m ? `Showing the first ${bytes(b.bytes)} of ${bytes(m.body_bytes)}; the rest was not kept (body limit).` : "");
+    setText(trunc, has && b?.truncated && m ? t("Showing the first {kept} of {size}; the rest was not kept (body limit).").replace("{kept}", bytes(b.bytes)).replace("{size}", bytes(m.body_bytes)) : "");
     setHidden(trunc, !(has && b?.truncated));
     setHidden(img, !image);
     if (image && m && b?.base64) {
@@ -247,16 +258,25 @@ function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
     setHidden(copyRow, !isText);
     setHidden(pre, !isText);
     const bin = has && !image && !isText && m && b;
-    setText(binary, bin ? `${bytes(b.bytes)} of ${isTextType(m.content_type) ? "text that is not valid UTF-8" : "binary"} data${m.encoding ? ` (${m.encoding})` : ""}; export a HAR to get the bytes.` : "");
+    setText(binary, bin ? t(BINARY_TEXT[`${isTextType(m.content_type) ? "text" : "binary"}${m.encoding ? "-enc" : ""}`]).replace("{size}", bytes(b.bytes)).replace("{encoding}", m.encoding ?? "") : "");
     setHidden(binary, !bin);
   }
 }
 
+const BINARY_TEXT: Record<string, string> = {
+  binary: "{size} of binary data; export a HAR to get the bytes.",
+  "binary-enc": "{size} of binary data ({encoding}); export a HAR to get the bytes.",
+  text: "{size} of text that is not valid UTF-8; export a HAR to get the bytes.",
+  "text-enc": "{size} of text that is not valid UTF-8 ({encoding}); export a HAR to get the bytes.",
+};
+
+const SEGMENT_TEXT = ["connect {time}", "waiting {time}", "receiving {time}"];
+
 function timingPane(): Pane {
   const names = ["connect", "waiting", "receiving"];
   const segs = names.map((name) => h("span", { class: `tseg t-${name}` }));
-  const bar = h("div", { class: "tbar", role: "img", "aria-label": "timing breakdown" }, ...segs);
-  const flight = h("p", { class: "dim" }, "Still in flight.");
+  const bar = h("div", { class: "tbar", role: "img", "aria-label": t("timing breakdown") }, ...segs);
+  const flight = h("p", { class: "dim" }, t("Still in flight."));
   const rows = kv(["Started", "Ended", "Connect (dial and TLS)", "Waiting (first byte)", "Receiving", "Total"]);
   const el = h("div", {}, h("div", { class: "tslot" }, flight, bar), rows.el);
   return {
@@ -268,14 +288,14 @@ function timingPane(): Pane {
       setHidden(bar, f.pending);
       [f.connect_ms, f.ttfb_ms, receiving].forEach((ms, i) => {
         const seg = segs[i] as HTMLElement;
-        setTitle(seg, `${names[i]} ${millis(ms)}`);
+        setTitle(seg, t(SEGMENT_TEXT[i] ?? "").replace("{time}", millis(ms)));
         const w = `${Math.max(0, (ms / total) * 100)}%`;
         if (seg.style.width !== w) seg.style.width = w;
       });
       rows.set([
         dateTime(f.start),
         f.pending ? "" : dateTime(f.end),
-        f.connect_ms ? millis(f.connect_ms) : "reused or unknown",
+        f.connect_ms ? millis(f.connect_ms) : t("reused or unknown"),
         f.pending ? "" : millis(f.ttfb_ms),
         f.pending ? "" : millis(receiving),
         f.pending ? "" : millis(f.duration_ms),

@@ -2,7 +2,7 @@ import { bytes, ago } from '../format.ts';
 import type { State, Store, View } from '../state.ts';
 import { visibleFlows } from '../state.ts';
 import { q, setClass, setText, setTitle } from './dom';
-import { onLanguage, t } from './i18n';
+import { onLanguage, t, tn } from './i18n';
 
 const INFO_KEY = 'formnet.statusInfo';
 const INFO_KINDS = ['flows', 'bytes', 'hosts', 'machine', 'sample'] as const;
@@ -64,13 +64,13 @@ export class StatusBar {
 
   private sync(s: State): void {
     const st = s.status;
-    const engine = !s.connected && !st ? t('Server offline') : st ? `${t('Server')} ${st.version}${isDesktop() ? ` · ${t('desktop')}` : ''}` : t('Server');
+    const engine = !s.connected && !st ? t('Server offline') : st ? t(isDesktop() ? 'Server {version} · desktop' : 'Server {version}').replace('{version}', st.version) : t('Server');
     setText(this.engine, engine);
-    setTitle(this.engine, s.connected ? t('Connected to the formNET server') : t('Reconnecting to the formNET server'));
+    setTitle(this.engine, s.connected ? t('Connected to the FormNET server') : t('Reconnecting to the FormNET server'));
     setClass(this.engine, 'is-off', !s.connected);
     const p = st?.proxy;
-    setText(this.proxy, p ? `${t('Proxy')} ${p.addr}` : '');
-    setTitle(this.proxy, p ? (p.running ? t('The proxy is listening') : `${t('The proxy is not running')}${p.error ? `: ${p.error}` : ''}`) : '');
+    setText(this.proxy, p ? t('Proxy {addr}').replace('{addr}', p.addr) : '');
+    setTitle(this.proxy, p ? (p.running ? t('The proxy is listening') : p.error ? t('The proxy is not running: {error}').replace('{error}', p.error) : t('The proxy is not running')) : '');
     setClass(this.proxy, 'is-off', !!p && !p.running);
     setText(this.ca, p ? t(p.intercept ? 'HTTPS opened' : 'HTTPS tunnelled') : '');
     setTitle(this.ca, st ? t(st.ca.trusted ? 'The root is trusted on this computer' : 'The root is not trusted yet: HTTPS is counted, not read') : '');
@@ -84,27 +84,27 @@ export class StatusBar {
     let text = '', tip = '';
     if (kind === 'flows') {
       const shown = visibleFlows(s).length;
-      text = shown === s.flows.size ? `${s.flows.size} ${t('flows')}` : `${shown} ${t('of')} ${s.flows.size} ${t('flows')}`;
-      tip = t('Flows kept, and how many the filter shows');
+      text = shown === s.flows.size ? tn(s.flows.size, '{n} flow', '{n} flows') : t('{shown} of {total} flows').replace('{shown}', String(shown)).replace('{total}', String(s.flows.size));
+      tip = t('Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.');
     } else if (kind === 'bytes') {
       let sent = 0, got = 0;
       for (const f of s.flows.values()) { sent += f.bytes_sent; got += f.bytes_received; }
-      text = `${bytes(sent)} ${t('sent')} · ${bytes(got)} ${t('received')}`;
-      tip = t('Bytes through the proxy, in the flows kept');
+      text = t('{sent} sent · {received} received').replace('{sent}', bytes(sent)).replace('{received}', bytes(got));
+      tip = t('Bytes through the proxy, in the flows kept. Click for the next readout, Shift+click for the previous.');
     } else if (kind === 'hosts') {
-      text = `${s.hosts.length} ${t('hosts')}`;
-      tip = t('Hosts seen through the proxy');
+      text = tn(s.hosts.length, '{n} host', '{n} hosts');
+      tip = t('Hosts seen through the proxy. Click for the next readout, Shift+click for the previous.');
     } else if (kind === 'machine') {
       const m = s.machine;
-      text = m ? `${(m.processes ?? []).length} ${t('processes')} · ${(m.connections ?? []).length} ${t('connections')}` : t('No sample yet');
-      tip = t('The last sample of the machine\'s connection table');
+      text = m ? t('{processes} · {connections}').replace('{processes}', tn((m.processes ?? []).length, '{n} process', '{n} processes')).replace('{connections}', tn((m.connections ?? []).length, '{n} connection', '{n} connections')) : t('No sample yet');
+      tip = t('The last sample of the machine\'s connection table. Click for the next readout, Shift+click for the previous.');
     } else {
       const m = s.machine;
-      text = m?.taken ? `${t('Sampled')} ${ago(m.taken)}` : t('No sample yet');
-      tip = t('When the machine was last sampled');
+      text = m?.taken ? t('Sampled {age}').replace('{age}', ago(m.taken)) : t('No sample yet');
+      tip = t('When the machine was last sampled. Click for the next readout, Shift+click for the previous.');
     }
     setText(this.info, text);
-    setTitle(this.info, `${tip}. ${t('Click for the next readout, Shift+click for the previous.')}`);
+    setTitle(this.info, tip);
   }
 
   private syncHint(s: State): void {
@@ -113,7 +113,7 @@ export class StatusBar {
     const notice = (s.status?.notices ?? []).join(' ');
     setClass(this.hint, 'is-error', !!notice);
     if (notice) { setText(this.hint, notice); setTitle(this.hint, notice); return; }
-    const text = HINTS[s.view].split(' · ').map((x) => t(x)).join(' · ');
+    const text = t(HINTS[s.view]);
     setText(this.hint, text);
     setTitle(this.hint, text);
   }

@@ -1,5 +1,42 @@
 import { el, q, setChecked, setText, setValue } from '../dom';
 import { enhanceSelect } from '../dropdown';
+import { onLanguage, t } from '../i18n';
+
+/** `english` in the current language with each {key} filled in, the way formvis's status.ts and properties.ts assemble text. */
+export const tf = (english: string, values: Record<string, string>): string =>
+  Object.entries(values).reduce((s, [k, v]) => s.split(`{${k}}`).join(v), t(english));
+
+/** `english` in the current language written into `host`, each {key} standing for the node given for it. The text
+ *  between them is the host's own text nodes, rewritten in place, and the nodes are moved, never rebuilt; it is written
+ *  again whenever the language changes. The host carries data-no-i18n: the page translator leaves it to this. */
+export function richText(host: HTMLElement, english: string, parts: Record<string, Node>): void {
+  const write = (): void => {
+    const texts = Array.from(host.childNodes).filter((n): n is Text => n instanceof Text);
+    const want: Node[] = [];
+    let i = 0;
+    for (const piece of t(english).split(/(\{\w+\})/)) {
+      const part = /^\{(\w+)\}$/.exec(piece)?.[1];
+      if (part && parts[part]) { want.push(parts[part]); continue; }
+      if (!piece) continue;
+      const node = texts[i++] ?? document.createTextNode('');
+      if (node.data !== piece) node.data = piece;
+      want.push(node);
+    }
+    let at = host.firstChild;
+    for (const n of want) { if (n === at) at = at.nextSibling; else host.insertBefore(n, at); }
+    while (at) { const next = at.nextSibling; host.removeChild(at); at = next; }
+  };
+  host.dataset.noI18n = '';
+  write();
+  onLanguage(write);
+}
+
+/** A row's label in the current language, its English kept where the dialog's relabel pass looks for it. */
+export function labelText(span: HTMLElement, english: string): void {
+  setText(span, t(english));
+  span.dataset.en = english;
+  span.dataset.shown = span.textContent ?? '';
+}
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -14,10 +51,12 @@ export function sliderRow(label: string, min: number, max: number, step: number,
   const toPos = (v: number): number => (log ? Math.round((1000 * Math.log(clamp(v, min, max) / min)) / Math.log(max / min)) : v);
   const fromPos = (p: number): number => (log ? clamp(Number((min * Math.pow(max / min, p / 1000)).toPrecision(3)), min, max) : p);
   const root = el(`<div class="cv-field cv-slider"><span></span><div class="cv-slider-ctl"><input type="range" min="${log ? 0 : min}" max="${log ? 1000 : max}" step="${log ? 1 : step}"><input class="cv-num" type="number" min="${lo}" max="${hi}" step="${step}"></div></div>`);
-  setText(q(root, 'span'), label);
+  labelText(q(root, 'span'), label);
   const range = q(root, 'input[type="range"]') as HTMLInputElement;
   const box = q(root, 'input.cv-num') as HTMLInputElement;
-  range.setAttribute('aria-label', label); box.setAttribute('aria-label', `${label} value`);   // named for assistive technology (1.53.4)
+  const name = (): void => { range.setAttribute('aria-label', t(label)); box.setAttribute('aria-label', tf('{label} value', { label: t(label) })); };
+  name();
+  onLanguage(name);
   const fill = (): void => { const lo2 = Number(range.min), span = Number(range.max) - lo2; range.style.setProperty('--pct', `${span > 0 ? clamp(((range.valueAsNumber - lo2) / span) * 100, 0, 100) : 0}%`); };
   range.addEventListener('input', fill);
   range.addEventListener('input', () => {
@@ -40,7 +79,7 @@ export function sliderRow(label: string, min: number, max: number, step: number,
     const reset = (): void => { range.value = String(toPos(def)); fill(); box.value = fmt(def); onInput(def); };
     q(root, 'span').addEventListener('dblclick', reset);
     range.addEventListener('dblclick', reset);
-    q(root, 'span').title = 'Double-click to reset';
+    q(root, 'span').title = t('Double-click to reset');
   }
   // Scrubbable label: a horizontal drag on the label moves the value across the slider's span in about 250 px; Shift is ten times faster, Alt ten times finer.
   const lab = q(root, 'span');
@@ -64,9 +103,10 @@ export function sliderRow(label: string, min: number, max: number, step: number,
 
 /** With `onHover`, the choices show as the hover-preview menu: the value under the pointer or arrow keys, null when it closes. */
 export function selectRow(label: string, options: ReadonlyArray<readonly [string, string]>, onChange: (v: string) => void, onHover?: (v: string | null) => void): Row<string> {
-  const root = el(`<label class="cv-field"><span></span><select class="cv-input">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>`);
-  setText(q(root, 'span'), label);
+  const root = el('<label class="cv-field"><span></span><select class="cv-input"></select></label>');
+  labelText(q(root, 'span'), label);
   const sel = q(root, 'select') as HTMLSelectElement;
+  for (const [v, text] of options) sel.add(new Option(t(text), v));
   sel.addEventListener('change', () => onChange(sel.value));
   if (onHover) enhanceSelect(sel, { onHover });
   return { el: root, set(v) { if (sel.value !== v) sel.value = v; } };
@@ -74,7 +114,7 @@ export function selectRow(label: string, options: ReadonlyArray<readonly [string
 
 export function checkRow(label: string, onChange: (v: boolean) => void): Row<boolean> {
   const root = el('<label class="cv-field cv-check"><span></span><input type="checkbox"></label>');
-  setText(q(root, 'span'), label);
+  labelText(q(root, 'span'), label);
   const box = q(root, 'input') as HTMLInputElement;
   box.addEventListener('change', () => onChange(box.checked));
   return { el: root, set(v) { setChecked(box, v); } };
@@ -84,7 +124,7 @@ const TOGGLE_TRACK = '<span class="cv-toggle-track"><span class="cv-toggle-knob"
 
 export function toggleRow(label: string, onChange: (v: boolean) => void): Row<boolean> {
   const root = el(`<label class="cv-field cv-toggle-row"><span></span><span class="cv-toggle"><input type="checkbox">${TOGGLE_TRACK}</span></label>`);
-  setText(q(root, 'span'), label);
+  labelText(q(root, 'span'), label);
   const box = q(root, 'input') as HTMLInputElement;
   box.addEventListener('change', () => onChange(box.checked));
   return { el: root, set(v) { setChecked(box, v); } };
@@ -98,7 +138,7 @@ export function toggleOf(box: HTMLInputElement): HTMLLabelElement {
 
 export function colorRow(label: string, onChange: (hex: string) => void): Row<string> {
   const root = el('<label class="cv-field"><span></span><input class="cv-input cv-color" type="color"></label>');
-  setText(q(root, 'span'), label);
+  labelText(q(root, 'span'), label);
   const inp = q(root, 'input') as HTMLInputElement;
   inp.addEventListener('input', () => onChange(inp.value));
   return { el: root, set(v) { setValue(inp, v); } };
@@ -106,7 +146,7 @@ export function colorRow(label: string, onChange: (hex: string) => void): Row<st
 
 export function numberRow(label: string, min: number, max: number, step: number, onChange: (v: number) => void): Row<number> & { input: HTMLInputElement } {
   const root = el(`<label class="cv-field"><span></span><input class="cv-input" type="number" min="${min}" max="${max}" step="${step}"></label>`);
-  setText(q(root, 'span'), label);
+  labelText(q(root, 'span'), label);
   const input = q(root, 'input') as HTMLInputElement;
   input.addEventListener('input', () => { const v = input.valueAsNumber; if (Number.isFinite(v)) onChange(v); });
   return { el: root, input, set(v) { setValue(input, fmt(v)); } };

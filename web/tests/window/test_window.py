@@ -178,7 +178,7 @@ def test_home_shows_over_an_empty_recording(page: tuple[Page, list[str]]) -> Non
     # No flows yet: the Home screen covers the views; its Flows item puts it away.
     home = pg.locator(".cv-home")
     home.wait_for(state="visible", timeout=10000)
-    assert home.locator(".cv-home-brand").inner_text().startswith("formNET")
+    assert home.locator(".cv-home-brand").inner_text().startswith("FormNET")
     home.locator(".cv-home-nav [data-cmd='view-flows']").click()
     home.wait_for(state="hidden", timeout=5000)
     assert pg.locator(".view-flows").is_visible()
@@ -202,7 +202,7 @@ def test_setup_shows_proxy_address(page: tuple[Page, list[str]], server) -> None
     pg, _ = page
     pg.locator(".cv-tab-strip").get_by_role("tab", name="Setup", exact=True).click()
     addr = server["proxy"].removeprefix("http://")
-    pg.wait_for_selector(f".view-setup code.big:has-text('{addr}')", timeout=10000)
+    pg.wait_for_selector(f".view-setup code.cv-setup-addr:has-text('{addr}')", timeout=10000)
     assert pg.locator(".view-setup").get_by_text("Root certificate").is_visible()
 
 
@@ -217,7 +217,7 @@ def test_proxied_request_appears_with_detail(page: tuple[Page, list[str]], serve
     row.click()
     pane = pg.locator("aside.detail")
     pane.wait_for(state="visible", timeout=5000)
-    pg.locator(".subtab", has_text="Request").click()
+    pane.get_by_role("tab", name="Request", exact=True).click()
     pg.wait_for_selector("aside.detail dl.headers dt", timeout=5000)
     assert pane.locator("dl.headers dt").count() >= 1
     pg.keyboard.press("Escape")

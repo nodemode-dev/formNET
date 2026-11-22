@@ -1,7 +1,38 @@
-// Pure formatting helpers; no DOM, no state.
+// Formatting helpers: no DOM, no state. Numbers, times and dates are written
+// for the interface language; units (B, KB, ms, s) stay as they are.
+import { language, t, tn } from "./ui/i18n";
+import { RTL_LANGS } from "./ui/i18n/langs";
+
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+function num(v: number, digits: number): string {
+  const key = `${language()}|${digits}`;
+  let f = numberFormats.get(key);
+  if (!f) {
+    try { f = new Intl.NumberFormat(language(), { minimumFractionDigits: digits, maximumFractionDigits: digits }); } catch { f = new Intl.NumberFormat("en", { minimumFractionDigits: digits, maximumFractionDigits: digits }); }
+    numberFormats.set(key, f);
+  }
+  return f.format(v);
+}
+
+function dates(kind: "clock" | "full"): Intl.DateTimeFormat {
+  const key = `${language()}|${kind}`;
+  let f = dateFormats.get(key);
+  if (!f) {
+    const opts: Intl.DateTimeFormatOptions = kind === "clock" ? { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3, hourCycle: "h23" } : { dateStyle: "medium", timeStyle: "medium" };
+    try { f = new Intl.DateTimeFormat(language(), opts); } catch { f = new Intl.DateTimeFormat("en", opts); }
+    dateFormats.set(key, f);
+  }
+  return f;
+}
+
+// A number with a Latin unit reads left to right inside a right-to-left
+// sentence ("17.7 KB", never "KB 17.7").
+const ltr = (s: string): string => (RTL_LANGS.has(language()) ? `⁦${s}⁩` : s);
 
 export function bytes(n: number | undefined): string {
-  if (!n || n <= 0) return "0 B";
+  if (!n || n <= 0) return ltr(`${num(0, 0)} B`);
   const units = ["B", "KB", "MB", "GB", "TB"];
   let v = n;
   let i = 0;
@@ -9,42 +40,51 @@ export function bytes(n: number | undefined): string {
     v /= 1024;
     i += 1;
   }
-  return i === 0 ? `${v} B` : `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
+  return ltr(i === 0 ? `${num(v, 0)} B` : `${num(v, v >= 100 ? 0 : 1)} ${units[i]}`);
 }
 
 export function millis(ms: number | undefined): string {
   if (ms === undefined || ms < 0) return "";
-  if (ms < 1) return "<1 ms";
-  if (ms < 1000) return `${Math.round(ms)} ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(2)} s`;
-  return `${(ms / 60000).toFixed(1)} min`;
+  if (ms < 1) return ltr(`<${num(1, 0)} ms`);
+  if (ms < 1000) return ltr(`${num(Math.round(ms), 0)} ms`);
+  if (ms < 60000) return ltr(`${num(ms / 1000, 2)} s`);
+  return ltr(`${num(ms / 60000, 1)} min`);
+}
+
+function parse(iso: string | undefined): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) || d.getFullYear() < 1971 ? null : d;
 }
 
 export function clock(iso: string | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime()) || d.getFullYear() < 1971) return "";
-  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+  const d = parse(iso);
+  return d ? dates("clock").format(d) : "";
 }
 
+// A date is written in the language's own order, so inside a left-to-right
+// value it keeps its right-to-left reading where the language has one.
 export function dateTime(iso: string | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime()) || d.getFullYear() < 1971) return "";
-  return d.toLocaleString();
+  const d = parse(iso);
+  if (!d) return "";
+  const s = dates("full").format(d);
+  return RTL_LANGS.has(language()) ? `⁧${s}⁩` : s;
 }
 
+// ago is "just now", then seconds, minutes or hours. A language whose table
+// does not word it yet gets Intl's short relative time, which says the same.
 export function ago(iso: string | undefined, now = Date.now()): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const t = d.getTime();
-  if (Number.isNaN(t) || d.getFullYear() < 1971) return "";
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 5) return "just now";
-  if (s < 60) return `${s} s ago`;
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  return `${Math.round(s / 3600)} h ago`;
+  const d = parse(iso);
+  if (!d) return "";
+  const s = Math.max(0, Math.round((now - d.getTime()) / 1000));
+  if (s < 5) return RTL_LANGS.has(language()) ? `⁧${t("just now")}⁩` : t("just now");
+  const [n, key, unit]: [number, string, Intl.RelativeTimeFormatUnit] = s < 60 ? [s, "{n} s ago", "second"] : s < 3600 ? [Math.round(s / 60), "{n} min ago", "minute"] : [Math.round(s / 3600), "{n} h ago", "hour"];
+  const lang = language();
+  let said = tn(n, key, key);
+  if (lang !== "en" && t(key) === key) {
+    try { said = new Intl.RelativeTimeFormat(lang, { style: "short", numeric: "always" }).format(-n, unit); } catch { /* the English form */ }
+  }
+  return RTL_LANGS.has(lang) ? `⁧${said}⁩` : said;
 }
 
 export function statusClass(status: number, error?: string): string {
