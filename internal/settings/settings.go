@@ -1,5 +1,6 @@
 // Package settings keeps the proxy choices a person makes in the client
-// across restarts, in <data>/settings.json, readable by that user only.
+// (interception, the passthrough list, the system proxy) across restarts, in
+// <data>/settings.json, readable by that user only.
 package settings
 
 import (
@@ -25,6 +26,7 @@ type Settings struct {
 	Version     int      `json:"version"`
 	Intercept   string   `json:"intercept"` // auto, on or off
 	Passthrough []string `json:"passthrough"`
+	SystemProxy bool     `json:"system_proxy"` // point the system proxy at FormNET while it runs; absent in older files means false
 }
 
 // Defaults is what a first start uses.
@@ -87,6 +89,19 @@ func (f *File) Update(intercept *string, passthrough []string) error {
 	if passthrough != nil {
 		next.Passthrough = clean(passthrough)
 	}
+	return f.writeLocked(next)
+}
+
+// SetSystemProxy keeps the system proxy choice and writes the whole file.
+func (f *File) SetSystemProxy(on bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	next := f.cur
+	next.SystemProxy = on
+	return f.writeLocked(next)
+}
+
+func (f *File) writeLocked(next Settings) error {
 	next.Version = Version
 	raw, err := json.MarshalIndent(next, "", "  ")
 	if err != nil {

@@ -83,6 +83,9 @@ type Flow struct {
 	DurationMS float64 `json:"duration_ms"` // start to end
 
 	Error string `json:"error,omitempty"`
+
+	ResentFrom string `json:"resent_from,omitempty"` // the flow this one sent again, when FormNET resent it
+	Edited     bool   `json:"edited,omitempty"`      // the resent request was changed before it went out
 }
 
 // Summary is the Flow without bodies, as the list and the stream carry it.

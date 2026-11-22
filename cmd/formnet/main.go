@@ -31,6 +31,7 @@ import (
 	"github.com/nodemode-dev/formnet/internal/proxy"
 	"github.com/nodemode-dev/formnet/internal/server"
 	"github.com/nodemode-dev/formnet/internal/settings"
+	"github.com/nodemode-dev/formnet/internal/sysproxy"
 	"github.com/nodemode-dev/formnet/internal/terminal"
 	"github.com/nodemode-dev/formnet/internal/userfile"
 )
@@ -54,6 +55,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return caCommand(args[1:], stdout, stderr)
 	case "snapshot":
 		return snapshot(stdout, stderr)
+	case "sysproxy":
+		return sysproxy.Command(args[1:], stdout, stderr)
 	case "url":
 		return printURL(stdout, stderr)
 	case "open":
@@ -83,6 +86,9 @@ func usage(w io.Writer) {
   ca export PATH   write the root certificate (PEM) to PATH
   ca trust         print the command that makes this computer trust the root
   snapshot         print the machine's connection table once, as JSON
+  sysproxy         print whether the system proxy points at formnet (macOS, Windows)
+  sysproxy on|off  ask the running formnet to set the system proxy, or put the previous one back
+  sysproxy restore put back the system proxy a formnet that did not stop cleanly left (no server needed)
   mcp              serve MCP on stdio for agents; reads the running formnet, starts nothing
   agents sync      write agents/, the skill pack's tool table and .agents/skills (in the repository)
   agents check     fail when those files are stale or a skill breaks the format contract
@@ -100,10 +106,14 @@ Settings (environment):
   FORMNET_MACHINE_INTERVAL  seconds between machine snapshots; default 2
   FORMNET_REVERSE_DNS       1 to name remote addresses in the machine view (sends PTR queries); default off
   FORMNET_TOKEN             this run's session token; default a new one, kept in <data>/token
+  FORMNET_SYSTEM_PROXY      1 to point the system proxy at formnet while it runs, 0 not to (macOS, Windows); default off
 
-Interception and the passthrough list chosen in the web client are kept in
-<data>/settings.json; FORMNET_INTERCEPT or FORMNET_PASSTHROUGH, when set, wins
-for that run and is not written there.
+Interception, the passthrough list and the system proxy chosen in the web
+client are kept in <data>/settings.json; FORMNET_INTERCEPT,
+FORMNET_PASSTHROUGH or FORMNET_SYSTEM_PROXY, when set, wins for that run and
+is not written there. While the system proxy points at formnet, the settings
+it replaced are kept in <data>/sysproxy.json and put back when formnet stops,
+or at the next start after a crash.
 
 The web client answers only to a page opened with the session token: use the
 address "formnet serve" prints, or run "formnet open". Scripts send the token
@@ -129,6 +139,11 @@ func serve(stdout, stderr io.Writer) int {
 	if err := os.MkdirAll(cfg.Data, 0o700); err != nil {
 		log.Error("data folder", "path", cfg.Data, "err", err)
 		return 1
+	}
+	if msg, err := sysproxy.Recover(cfg.Data); err != nil {
+		log.Warn("system proxy left by the last run", "err", err, "run", "formnet sysproxy restore")
+	} else if msg != "" {
+		log.Info(msg)
 	}
 	authority, err := ca.Load(cfg.Data)
 	if err != nil {
@@ -195,10 +210,11 @@ func serve(stdout, stderr io.Writer) int {
 	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
 	remember := func(u server.ProxySettings) error { return saved.Update(u.Intercept, u.Passthrough) }
+	systemProxy := sysproxy.New(sysproxy.Options{Data: cfg.Data, Address: proxyAddr, API: apiAddr, Enabled: kept.SystemProxy, Remember: saved.SetSystemProxy, Log: log})
 	terminals := terminal.New(terminal.Options{APIAddr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Log: log})
 	defer terminals.Close()
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, Terminals: terminals}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, SystemProxy: systemProxy, BodyLimit: cfg.BodyLimit, Terminals: terminals}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
@@ -223,6 +239,16 @@ func serve(stdout, stderr io.Writer) int {
 	// The desktop app waits for this line before it opens its window.
 	fmt.Fprintf(stdout, "formnet desktop ready http://%s/\n", apiAddr)
 
+	wantSystemProxy := kept.SystemProxy
+	if cfg.SystemProxySet {
+		wantSystemProxy = cfg.SystemProxy
+	}
+	if ok, _ := sysproxy.Supported(); ok && wantSystemProxy && ctx.Err() == nil {
+		if err := systemProxy.Enable(); err != nil {
+			log.Warn("system proxy not set", "err", err)
+		}
+	}
+
 	code := 0
 	select {
 	case <-ctx.Done():
@@ -236,6 +262,9 @@ func serve(stdout, stderr io.Writer) int {
 			log.Error("api stopped", "err", err)
 			code = 1
 		}
+	}
+	if err := systemProxy.Close(); err != nil {
+		log.Warn("system proxy not put back", "err", err, "run", "formnet sysproxy restore")
 	}
 	terminals.Close()
 	removeEndpoints(cfg.Data)

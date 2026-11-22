@@ -59,6 +59,22 @@ func (t *timing) ttfbMS() float64 {
 
 // forward relays one plain exchange and records it.
 func (p *Proxy) forward(w http.ResponseWriter, r *http.Request, o origin) {
+	if copyErr := p.exchange(w, r, o, nil); copyErr != nil {
+		// The upstream stopped mid-body. Resetting the client connection is the
+		// only honest signal that the body is not complete.
+		panic(http.ErrAbortHandler)
+	}
+}
+
+// flowHook marks a flow the proxy itself starts and says when it is stored.
+type flowHook struct {
+	mark  func(flow.Flow) flow.Flow
+	added chan<- string
+}
+
+// exchange relays one plain exchange and records it. A non-nil error means
+// the upstream body was cut short after the response headers went out.
+func (p *Proxy) exchange(w http.ResponseWriter, r *http.Request, o origin, hook *flowHook) error {
 	rawURL := o.url(r)
 	f := p.newFlow(flow.KindHTTP, o, r.Method, rawURL)
 	reqCapture := newCapture(r.Body, p.opts.BodyLimit)
@@ -66,28 +82,30 @@ func (p *Proxy) forward(w http.ResponseWriter, r *http.Request, o origin) {
 	f.Request = reqCapture.message(r.Header, requestLine, p.opts.BodyLimit)
 	f.ClientProtocol = r.Proto
 	f.Protocol = r.Proto
+	if hook != nil && hook.mark != nil {
+		f = hook.mark(f)
+	}
 	f = p.opts.Store.Add(f)
+	if hook != nil && hook.added != nil {
+		hook.added <- f.ID
+	}
 
 	out, err := p.outgoing(r, rawURL, reqCapture)
 	if err != nil {
 		p.fail(w, f, http.StatusBadRequest, "formnet could not build the upstream request: "+err.Error())
-		return
+		return nil
 	}
 	tm := &timing{}
 	out = out.WithContext(httptrace.WithClientTrace(out.Context(), tm.trace()))
 	resp, err := p.transport.RoundTrip(out)
 	if err != nil {
 		p.fail(w, f, statusFor(err), "formnet could not reach "+f.Host+": "+err.Error())
-		return
+		return nil
 	}
 	defer resp.Body.Close()
 	f, copyErr := p.relayResponse(w, resp, f, tm, reqCapture, requestLine, r.Header)
 	p.finish(f)
-	if copyErr != nil {
-		// The upstream stopped mid-body. Resetting the client connection is the
-		// only honest signal that the body is not complete.
-		panic(http.ErrAbortHandler)
-	}
+	return copyErr
 }
 
 // outgoing builds the upstream request from the client's.
