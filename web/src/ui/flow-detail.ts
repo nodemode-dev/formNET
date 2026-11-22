@@ -1,11 +1,12 @@
-import { api } from "../api.ts";
+import { api, HTTPError } from "../api.ts";
 import { copyButton, h } from "../dom.ts";
-import { bytes, dateTime, isImageType, isJSONType, isTextType, millis, prettyJSON, shellQuote } from "../format.ts";
+import { bytes, clock, dateTime, isImageType, isJSONType, isTextType, millis, prettyJSON, shellQuote } from "../format.ts";
 import type { State, Store } from "../state.ts";
 import type { Body, FlowDetail, Message } from "../types.ts";
-import { patchList, setClass, setHidden, setText, setTitle, swapMedia } from "./dom";
+import { patchList, setClass, setDisabled, setHidden, setText, setTitle, swapMedia } from "./dom";
 import { onLanguage, t } from "./i18n";
 import { icon } from "./icons";
+import { ResendDialog } from "./resend-dialog";
 import { toast } from "./toast";
 
 type Tab = "summary" | "request" | "response" | "timing";
@@ -79,6 +80,7 @@ export function flowDetail(store: Store): HTMLElement {
         // Answers for a flow that is no longer selected are dropped.
         if (store.get().selectedId !== id || d.id !== id) return;
         current = d;
+        setClass(body, "is-stale", false);
         paint();
       })
       .catch((err: Error) => {
@@ -91,8 +93,11 @@ export function flowDetail(store: Store): HTMLElement {
     current = null;
     loadedFor = "";
     body.scrollTop = 0;
+    setClass(body, "is-stale", false);
   };
 
+  // Another selection keeps the panes of the last flow, dimmed, until its own detail arrives: emptying them for
+  // "Loading" and filling them again would move everything below the title twice.
   const render = (s: State) => {
     const id = s.selectedId;
     const f = id ? s.flows.get(id) : undefined;
@@ -102,7 +107,11 @@ export function flowDetail(store: Store): HTMLElement {
       reset();
       return;
     }
-    if (current && current.id !== id) reset();
+    if (current && current.id !== id && !body.classList.contains("is-stale")) {
+      loadedFor = "";
+      body.scrollTop = 0;
+      setClass(body, "is-stale", true);
+    }
     if (!current) paint();
     load(id, f.pending ? `${f.seq}` : `${f.seq}:done`);
   };
@@ -134,11 +143,35 @@ function summaryPane(store: Store): Pane {
     h("div", { class: "cv-improve" }, addBtn),
   );
   const ghost = "cv-btn cv-btn-ghost";
-  const el = h("div", {}, h("div", { class: "cv-improve" }, copyButton("Copy as curl", () => (f ? asCurl(f) : ""), ghost), copyButton("Copy URL", () => f?.url ?? "", ghost), odd), rows.el, refused);
+  const resendBtn = h("button", { type: "button", class: "cv-btn", onClick: () => { if (f) resendAsCaptured(store, f, resendBtn as HTMLButtonElement); } }) as HTMLButtonElement;
+  resendBtn.innerHTML = icon("redo", 14);
+  const resendLabel = h("span", {}, t("Resend"));
+  resendBtn.append(resendLabel);
+  const editBtn = h("button", { type: "button", class: "cv-btn cv-btn-ghost", onClick: () => { if (f) editAndResend(store, f); } }, t("Edit and resend...")) as HTMLButtonElement;
+  const resendRow = h("div", { class: "cv-improve detail-resend" }, resendBtn, editBtn);
+  const fromLink = h("button", { type: "button", class: "linkish mono", onClick: () => {
+    const orig = f?.resent_from;
+    if (orig && store.get().flows.has(orig)) store.update({ selectedId: orig });
+  } }) as HTMLButtonElement;
+  const fromEdited = h("span", { class: "label" }, t("edited"));
+  rows.el.append(h("div", {}, h("dt", {}, t("Resent from")), h("dd", {}, fromLink, fromEdited)));
+  const el = h("div", {}, h("div", { class: "cv-improve" }, copyButton("Copy as curl", () => (f ? asCurl(f) : ""), ghost), copyButton("Copy URL", () => f?.url ?? "", ghost), odd), resendRow, rows.el, refused);
   return {
     el,
     patch: (next) => {
       f = next;
+      setClass(resendRow, "is-off", f.kind !== "http");
+      setDisabled(resendBtn, f.kind !== "http");
+      setDisabled(editBtn, f.kind !== "http");
+      setText(resendLabel, t("Resend"));
+      setText(editBtn, t("Edit and resend..."));
+      const orig = f.resent_from ? store.get().flows.get(f.resent_from) : undefined;
+      setText(fromLink, !f.resent_from ? "" : orig ? `${clock(orig.start)} ${orig.method} ${orig.url}` : t("a flow no longer kept"));
+      setTitle(fromLink, orig ? t("Show the original flow") : "");
+      setDisabled(fromLink, !orig);
+      setHidden(fromLink, !f.resent_from);
+      setText(fromEdited, t("edited"));
+      setHidden(fromEdited, !f.edited);
       const tls = !f.tls ? "" : f.tls.intercepted ? `${f.tls.version} ${f.tls.cipher}` : t("{version} {cipher} (not opened)").replace("{version}", f.tls.version).replace("{cipher}", f.tls.cipher);
       setHidden(odd, plainMethod.test(f.method));
       rows.set([
@@ -147,7 +180,7 @@ function summaryPane(store: Store): Pane {
         f.protocol,
         dateTime(f.start),
         f.pending ? t("pending") : millis(f.duration_ms),
-        f.client_process ? t("{process} (pid {pid}) from {client}").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")).replace("{client}", f.client) : f.client,
+        f.client_process && !f.client ? t("{process} (pid {pid})").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")) : f.client_process ? t("{process} (pid {pid}) from {client}").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")).replace("{client}", f.client) : f.client,
         `${f.host}${f.port ? `:${f.port}` : ""}`,
         tls,
         bytes(f.bytes_sent),
@@ -177,6 +210,42 @@ function addToPassthrough(store: Store, host: string): void {
       });
     })
     .catch((err: Error) => toast(err.message, "error"));
+}
+
+let editor: ResendDialog | null = null;
+
+/** Selects the resent flow once the stream has brought it, and says so. */
+function selectWhenKept(store: Store, id: string, edited: boolean): void {
+  toast(t(edited ? "Resent with your edits as a new flow." : "Resent as a new flow."));
+  let stop: () => void = () => undefined;
+  const go = (): boolean => {
+    if (!store.get().flows.has(id)) return false;
+    stop();
+    if (store.get().selectedId !== id) store.update({ selectedId: id });
+    return true;
+  };
+  if (go()) return;
+  stop = store.subscribe(() => { go(); });
+  window.setTimeout(() => stop(), 15000);
+}
+
+function editAndResend(store: Store, f: FlowDetail): void {
+  editor ??= new ResendDialog((id, edited) => selectWhenKept(store, id, edited));
+  editor.show(f);
+}
+
+/** Resend as captured. A conflict (the body was cut at the limit, or the flow is not http) shows the server's words
+ *  with the offer to edit the request first. */
+function resendAsCaptured(store: Store, f: FlowDetail, btn: HTMLButtonElement): void {
+  setDisabled(btn, true);
+  api
+    .resend(f.id)
+    .then(({ id }) => selectWhenKept(store, id, false))
+    .catch((err: Error) => {
+      if (err instanceof HTTPError && err.status === 409 && f.kind === "http") toast(err.message, "error", { actions: [{ label: t("Edit and resend..."), run: () => editAndResend(store, f) }] });
+      else toast(err.message, "error");
+    })
+    .finally(() => setDisabled(btn, false));
 }
 
 /** One side of the exchange. The response side keeps room for its headers and body from the start, so a pending flow
