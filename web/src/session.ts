@@ -1,8 +1,9 @@
-// The page's session is a bearer token the server printed and put in the
-// opening address (/?token=<hex>). There is no cookie: a cookie for 127.0.0.1
-// would travel to every other local server the person visits. The token is
-// read once from the address, kept here and in sessionStorage so a reload
-// survives, and removed from the address bar.
+// The page's session is the run's bearer token. The desktop app writes it to
+// sessionStorage under formnet.token before the page's script runs; a page
+// opened in a browser gets it in the opening address (/?token=<hex>), which is
+// read once, kept here and in sessionStorage so a reload survives, and removed
+// from the address bar. There is no cookie: a cookie for 127.0.0.1 would
+// travel to every other local server the person visits.
 
 const KEY = "formnet.token";
 let current = "";
