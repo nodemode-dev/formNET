@@ -2,6 +2,15 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.10.0 · 2026-11-22
+
+The documents match the app.
+
+- Help > FormNET Website opens FormNET's page on formai.studio. The old item, FormNET on GitHub, opened a repository only its members can see.
+- `SECURITY.md`: how to report a problem privately, what FormNET keeps in its data folder and who can read each file, why the root key and the upstream proxy's password are files only you can read rather than entries in the system's password store, and what FormNET listens on.
+- The README lists what FormNET does now (rules, breakpoints, throttling, the system proxy, filters, sessions, the MCP server and its 10 tools), says that updates come through FormPortal only, and names the maintainers: nodemode-ai (Mackin) as Owner, gbarnai (Greg) as Co-Owner.
+- `CLAUDE.md` and `AGENTS.md` describe every package, command and rule as they are, with the one exception to loopback and how agents use `formnet mcp`.
+
 ## 0.9.0 · 2026-11-22
 
 A tool for every day: find any request, read any body, keep a recording.
