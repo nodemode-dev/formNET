@@ -1,31 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The splash and main windows. The main window shows the page the bundled formnet server serves on 127.0.0.1, a remote origin to Tauri, so the capability lists that address and every app command (build.rs APP_COMMANDS) has an allow permission: the page asks for the title, says when it has painted (app_ready), routes the Edit keys to a focused field on macOS and sets the view's zoom. The window permissions serve the page's own caption buttons on Windows and Linux; core:default carries the menu permissions the page uses to set the macOS menu bar.",
+  "description": "The splash window, which calls nothing. The main window's page is served by the formnet server on a port known only at run time, so its capability is added by main.rs (allow_page, PAGE_PERMISSIONS) for exactly http://127.0.0.1:<that port> once the server's ready line names it.",
   "windows": [
-    "splash",
-    "main"
+    "splash"
   ],
-  "remote": {
-    "urls": [
-      "http://127.0.0.1:*"
-    ]
-  },
-  "permissions": [
-    "core:default",
-    "core:window:allow-minimize",
-    "core:window:allow-toggle-maximize",
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
-    "core:window:allow-is-maximized",
-    "core:window:allow-close",
-    "core:window:allow-start-dragging",
-    "core:window:allow-set-decorations",
-    "core:window:allow-set-title",
-    "core:event:default",
-    "allow-set-window-title",
-    "allow-app-ready",
-    "allow-text-edit",
-    "allow-ui-zoom"
-  ]
+  "permissions": []
 }
