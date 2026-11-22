@@ -16,6 +16,7 @@
 //	GET  /ca.pem                   the root certificate, for installing trust
 //	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows); credential headers redacted unless secrets=1
 //	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, machine.snapshot, ping
+//	     /api/terminal...          the terminal dock and the agent finder, when Deps.Terminals is set (internal/terminal)
 //	GET  /                         the web client
 //
 // Every request must carry a Host header for the loopback address (DNS
@@ -89,6 +90,8 @@ type Deps struct {
 	Quit    func()   // stops the run; nil leaves /api/quit unanswered
 	// Remember keeps a change made through POST /api/proxy for the next start; nil keeps nothing.
 	Remember func(ProxySettings) error
+	// Terminals adds the dock's terminal and agent finder routes under /api/terminal; nil adds none.
+	Terminals interface{ Register(mux *http.ServeMux) }
 }
 
 // Handler builds the API and client handler. It panics without a token,
@@ -117,6 +120,9 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/stream", s.stream)
 	if d.Quit != nil {
 		mux.HandleFunc("POST /api/quit", s.quit)
+	}
+	if d.Terminals != nil {
+		d.Terminals.Register(mux)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "no such route") })
 	mux.Handle("/", s.client())
@@ -594,6 +600,8 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 
 // The desktop window shows this page from 127.0.0.1, a remote origin to Tauri, whose commands travel over its own
 // ipc: scheme (http://ipc.localhost on Windows); a browser never reaches those, so allowing them costs nothing there.
+// The page itself also gets ws:// of its own Host (checked by the guard), for the terminal dock's socket, since
+// older WebKit does not count ws: as 'self'.
 const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; frame-ancestors 'none'"
 
 // client serves the embedded web client. The page and its files are static
@@ -629,7 +637,7 @@ func (s *handler) client() http.Handler {
 		}
 		defer index.Close()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", csp)
+		w.Header().Set("Content-Security-Policy", strings.Replace(csp, "connect-src 'self'", "connect-src 'self' ws://"+r.Host, 1))
 		_, _ = io.Copy(w, index)
 	})
 }

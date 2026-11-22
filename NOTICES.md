@@ -16,7 +16,7 @@ The SIL Open Font License 1.1 text is at https://openfontlicense.org.
 
 ## The server's Go modules
 
-Linked into the `formnet` binary to decode `br` and `zstd` bodies for display, pure Go (built with `CGO_ENABLED=0`). Versions from `go.mod`; licences as their `LICENSE` files in the module say. Only the packages listed in Notes are linked: the rest of `klauspost/compress` (gzhttp under Apache-2.0, the s2 command helpers under MIT, snappy under BSD-3-Clause) is not in the binary. `github.com/xyproto/randomstring` v1.0.5 (BSD-3-Clause, Copyright 2023 Alexander F. Rødseth) appears in `go.sum` only as a test dependency of the brotli module and is not linked. The full licence texts of the linked packages are in `licenses/`, copied unchanged from the modules, and travel with the desktop app.
+Linked into the `formnet` binary to decode `br` and `zstd` bodies for display and to run the terminal dock, pure Go (built with `CGO_ENABLED=0`). Versions from `go.mod`; licences as their `LICENSE` files in the module say. Only the packages listed in Notes are linked: the rest of `klauspost/compress` (gzhttp under Apache-2.0, the s2 command helpers under MIT, snappy under BSD-3-Clause) is not in the binary. `github.com/xyproto/randomstring` v1.0.5 (BSD-3-Clause, Copyright 2023 Alexander F. Rødseth) appears in `go.sum` only as a test dependency of the brotli module and is not linked. The full licence texts of the linked packages are in `licenses/`, copied unchanged from the modules, and travel with the desktop app.
 
 | Module | Version | Licence | Source | Notes |
 | --- | --- | --- | --- | --- |
@@ -24,6 +24,9 @@ Linked into the `formnet` binary to decode `br` and `zstd` bodies for display, p
 | github.com/klauspost/compress | v1.20.5 | BSD-3-Clause | https://github.com/klauspost/compress | packages zstd, huff0, fse, internal/cpuinfo, internal/le, internal/regmask and the module root; Copyright (c) 2012 The Go Authors, Copyright (c) 2019 Klaus Post |
 | github.com/klauspost/compress (zstd/internal/xxhash) | v1.20.5 | MIT | https://github.com/klauspost/compress | its own LICENSE.txt; Copyright (c) 2016 Caleb Spare |
 | github.com/klauspost/compress (internal/snapref) | v1.20.5 | BSD-3-Clause | https://github.com/klauspost/compress | its own LICENSE; Copyright (c) 2011 The Snappy-Go Authors |
+| github.com/coder/websocket | v1.8.15 | ISC | https://github.com/coder/websocket | the terminal dock's WebSocket; packages websocket, internal/bpool, internal/errd and internal/util, on every system; Copyright (c) 2025 Coder; `licenses/coder-websocket-LICENSE.txt` |
+| github.com/creack/pty | v1.1.24 | MIT | https://github.com/creack/pty | the terminal dock's PTY on macOS and Linux (not linked on Windows); Copyright (c) 2011 Keith Rarick; `licenses/creack-pty-LICENSE.txt` |
+| golang.org/x/sys | v0.49.0 | BSD-3-Clause | https://go.googlesource.com/sys | package unix on macOS and Linux (the terminal's process session), package windows on Windows (ConPTY and the job object); Copyright 2009 The Go Authors, with Google's additional patent grant; `licenses/golang-x-sys-LICENSE.txt` and `licenses/golang-x-sys-PATENTS.txt` |
 
 ## The desktop shell's crates (src-tauri)
 
