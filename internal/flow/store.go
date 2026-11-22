@@ -371,7 +371,7 @@ func (s *Store) Hosts() []HostSummary {
 		if last.After(h.LastSeen) {
 			h.LastSeen = last
 		}
-		if f.Kind != KindTunnel {
+		if f.Kind != KindTunnel && f.Kind != KindRefused {
 			h.Intercepted = true
 		}
 		if f.ClientProcess != "" {

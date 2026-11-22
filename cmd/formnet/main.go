@@ -30,6 +30,7 @@ import (
 	"github.com/nodemode-dev/formnet/internal/machine"
 	"github.com/nodemode-dev/formnet/internal/proxy"
 	"github.com/nodemode-dev/formnet/internal/server"
+	"github.com/nodemode-dev/formnet/internal/settings"
 	"github.com/nodemode-dev/formnet/internal/userfile"
 )
 
@@ -87,10 +88,14 @@ Settings (environment):
   FORMNET_BODY_LIMIT        bytes of each body kept; default 262144
   FORMNET_FLOW_LIMIT        flows kept in memory; default 5000
   FORMNET_PASSTHROUGH       hosts tunnelled without interception, comma-separated
-  FORMNET_INTERCEPT         auto (open HTTPS once the root is trusted), on, or off; default auto
+  FORMNET_INTERCEPT         auto (open HTTPS while the root is trusted), on, or off; default auto
   FORMNET_MACHINE_INTERVAL  seconds between machine snapshots; default 2
   FORMNET_REVERSE_DNS       1 to name remote addresses in the machine view (sends PTR queries); default off
   FORMNET_TOKEN             this run's session token; default a new one, kept in <data>/token
+
+Interception and the passthrough list chosen in the web client are kept in
+<data>/settings.json; FORMNET_INTERCEPT or FORMNET_PASSTHROUGH, when set, wins
+for that run and is not written there.
 
 The web client answers only to a page opened with the session token: use the
 address "formnet serve" prints, or run "formnet open". Scripts send the token
@@ -126,10 +131,11 @@ func serve(stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if cfg.Desktop {
+		signal.Ignore(syscall.SIGPIPE)
 		go func() {
 			_, _ = io.Copy(io.Discard, os.Stdin)
-			log.Info("the desktop app closed its pipe; stopping")
 			stop()
+			log.Info("the desktop app closed its pipe; stopping")
 		}()
 	}
 
@@ -148,27 +154,41 @@ func serve(stdout, stderr io.Writer) int {
 		return 1
 	}
 	info := authority.Info()
-	intercept := cfg.Intercept == "on" || (cfg.Intercept == "auto" && info.Trusted)
+	saved, err := settings.Open(cfg.Data)
+	if err != nil {
+		log.Warn("settings file not read; using the defaults until the next change", "err", err)
+	}
+	kept := saved.Current()
+	mode, passthrough := kept.Intercept, kept.Passthrough
+	if cfg.InterceptSet {
+		mode = cfg.Intercept
+	}
+	if cfg.PassthroughSet {
+		passthrough = cfg.Passthrough
+	}
+	intercept := mode == "on" || (mode == "auto" && info.Trusted)
 
 	store := flow.NewStore(cfg.FlowLimit)
 	monitor := machine.NewMonitorWithOptions(machine.Options{Interval: cfg.MachineInterval, Log: log, ReverseDNS: cfg.ReverseDNS})
 	go monitor.Run(ctx)
 
 	px := proxy.New(proxy.Options{
-		CA:          authority,
-		Store:       store,
-		BodyLimit:   cfg.BodyLimit,
-		Passthrough: cfg.Passthrough,
-		Intercept:   intercept,
-		Owner:       monitor.Owner,
-		Refuse:      []string{apiAddr, proxyAddr},
-		Log:         log,
+		CA:            authority,
+		Store:         store,
+		BodyLimit:     cfg.BodyLimit,
+		Passthrough:   passthrough,
+		InterceptMode: mode,
+		Trusted:       authority.TrustedNow,
+		Owner:         monitor.Owner,
+		Refuse:        []string{apiAddr, proxyAddr},
+		Log:           log,
 	})
 	proxyErr := make(chan error, 1)
 	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
+	remember := func(u server.ProxySettings) error { return saved.Update(u.Intercept, u.Passthrough) }
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
@@ -183,7 +203,7 @@ func serve(stdout, stderr io.Writer) int {
 		log.Warn("endpoints file", "err", err)
 	}
 	defer removeEndpoints(cfg.Data)
-	log.Info("formnet", "version", app.Version, "open", sessionURL(apiAddr, token), "proxy", proxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted, "intercept", intercept)
+	log.Info("formnet", "version", app.Version, "open", sessionURL(apiAddr, token), "proxy", proxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted, "intercept", intercept, "intercept_mode", mode)
 	switch {
 	case !info.Trusted && !intercept:
 		log.Info("the root certificate is not trusted yet, so HTTPS is counted but not opened", "run", "formnet ca trust")
