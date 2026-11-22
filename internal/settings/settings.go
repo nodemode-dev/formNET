@@ -27,6 +27,10 @@ type Settings struct {
 	Intercept   string   `json:"intercept"` // auto, on or off
 	Passthrough []string `json:"passthrough"`
 	SystemProxy bool     `json:"system_proxy"` // point the system proxy at FormNET while it runs; absent in older files means false
+
+	Throttle    *Throttle    `json:"throttle,omitempty"`    // absent: off (traffic.go)
+	Remote      *Remote      `json:"remote,omitempty"`      // absent: off, empty allow list
+	Breakpoints *Breakpoints `json:"breakpoints,omitempty"` // absent: 60 s, 20 at once
 }
 
 // Defaults is what a first start uses.

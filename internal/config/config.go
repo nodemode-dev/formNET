@@ -13,6 +13,8 @@
 //	FORMNET_INTERCEPT    auto (open HTTPS only while the root is trusted), on, or off; when set, wins over <data>/settings.json; default auto
 //	FORMNET_TOKEN        this run's session token; default a new random one, written to <data>/token
 //	FORMNET_SYSTEM_PROXY 1 or 0: point the system proxy at formnet for this run (macOS, Windows); when set, wins over <data>/settings.json
+//	FORMNET_REMOTE_CAPTURE 1 or 0: also listen for the proxy (never the API) on this computer's network addresses; when set, wins over <data>/settings.json
+//	FORMNET_REMOTE_ALLOW   comma-separated addresses or CIDR ranges allowed to use that listener; when set, wins over <data>/settings.json
 //	FORMNET_DESKTOP      set by the desktop app; the server stops when its stdin closes
 package config
 
@@ -20,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -52,6 +55,11 @@ type Config struct {
 	Desktop         bool
 	SystemProxy     bool // FORMNET_SYSTEM_PROXY's value
 	SystemProxySet  bool // FORMNET_SYSTEM_PROXY was set: it wins over <data>/settings.json for this run
+
+	RemoteCapture  bool     // FORMNET_REMOTE_CAPTURE's value
+	RemoteSet      bool     // FORMNET_REMOTE_CAPTURE was set: it wins over <data>/settings.json for this run
+	RemoteAllow    []string // FORMNET_REMOTE_ALLOW's entries, each an address or a CIDR range
+	RemoteAllowSet bool     // FORMNET_REMOTE_ALLOW was set: it wins over <data>/settings.json for this run
 }
 
 // Load resolves the configuration from the environment and the home folder.
@@ -110,7 +118,29 @@ func load(getenv func(string) string, home func() (string, error)) (Config, erro
 	default:
 		return Config{}, errors.New("FORMNET_SYSTEM_PROXY: must be 1 or 0")
 	}
+	remote, remoteSet := false, false
+	switch strings.ToLower(strings.TrimSpace(getenv("FORMNET_REMOTE_CAPTURE"))) {
+	case "":
+	case "1", "true", "yes", "on":
+		remote, remoteSet = true, true
+	case "0", "false", "no", "off":
+		remoteSet = true
+	default:
+		return Config{}, errors.New("FORMNET_REMOTE_CAPTURE: must be 1 or 0")
+	}
+	remoteAllow := splitList(getenv("FORMNET_REMOTE_ALLOW"))
+	for _, a := range remoteAllow {
+		if _, err := netip.ParsePrefix(a); err != nil {
+			if _, err := netip.ParseAddr(a); err != nil {
+				return Config{}, fmt.Errorf("FORMNET_REMOTE_ALLOW: %q is not an address or a CIDR range", a)
+			}
+		}
+	}
 	return Config{
+		RemoteCapture:   remote,
+		RemoteSet:       remoteSet,
+		RemoteAllow:     remoteAllow,
+		RemoteAllowSet:  strings.TrimSpace(getenv("FORMNET_REMOTE_ALLOW")) != "",
 		SystemProxy:     systemProxy,
 		SystemProxySet:  systemProxySet,
 		Data:            data,

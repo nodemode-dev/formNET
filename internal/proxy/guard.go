@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -32,6 +33,7 @@ type destinationGuard struct {
 	refuse   map[string]struct{} // ip:port, loopback-normalised
 	resolver Resolver
 	dialer   *net.Dialer
+	extra    atomic.Pointer[map[string]struct{}] // the remote listeners, while remote capture is on
 }
 
 func newGuard(refuse []string, resolver Resolver) *destinationGuard {
@@ -115,7 +117,7 @@ func (g *destinationGuard) resolve(ctx context.Context, hostPort string) ([]stri
 
 func (g *destinationGuard) refused(ip net.IP, port string) bool {
 	_, ok := g.refuse[net.JoinHostPort(normalise(ip).String(), port)]
-	return ok
+	return ok || g.extraRefused(ip, port)
 }
 
 // DialContext checks the target and connects to the first address that answers.

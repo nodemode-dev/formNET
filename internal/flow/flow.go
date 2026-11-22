@@ -86,6 +86,11 @@ type Flow struct {
 
 	ResentFrom string `json:"resent_from,omitempty"` // the flow this one sent again, when FormNET resent it
 	Edited     bool   `json:"edited,omitempty"`      // the resent request was changed before it went out
+
+	Rules     []string `json:"rules,omitempty"`     // names of the rules that matched this exchange
+	Paused    string   `json:"paused,omitempty"`    // request or response while it waits at a breakpoint
+	Throttled bool     `json:"throttled,omitempty"` // the throttle slowed this exchange or tunnel
+	Notes     []string `json:"notes,omitempty"`     // what FormNET did to it: blocked, mapped, edited, released
 }
 
 // Summary is the Flow without bodies, as the list and the stream carry it.
