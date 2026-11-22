@@ -86,6 +86,7 @@ type Proxy struct {
 	mode        string
 	passthrough []string
 	hijacked    map[net.Conn]struct{}
+	serveCtx    context.Context // ends when Serve stops; resends run under it
 
 	refusedMu sync.Mutex
 	refused   map[string]time.Time // last refused handshake per program and host
@@ -171,6 +172,9 @@ func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 		return err
 	}
 	p.setRunning(addr, true)
+	p.mu.Lock()
+	p.serveCtx = ctx
+	p.mu.Unlock()
 	p.log.Info("proxy listening", "addr", ln.Addr().String())
 	go p.followTrust(ctx)
 	srv := &http.Server{Handler: p, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second}
