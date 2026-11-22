@@ -2,6 +2,18 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.3.0 · 2026-11-22
+
+What FormNET records is honest, and what it exports is safe to share. This version carries the server's side; the window's new choices for it arrive in 0.4.0.
+
+- A program that refuses FormNET's certificate no longer vanishes. It leaves a flow marked refused, with the host, the program and the reason, so you can see that a pinned app tried to connect and add its host to the passthrough list.
+- HAR exports leave out passwords, tokens and cookies: the values of Authorization, Proxy-Authorization, Cookie and Set-Cookie read `[redacted]`, and the file says so. `GET /api/export/har?secrets=1` writes everything.
+- Bodies sent as Brotli or zstd show as text, as gzip bodies already did.
+- The HTTPS choice and the passthrough list are kept when FormNET restarts. In Auto, trusting the root while FormNET runs opens HTTPS within about ten seconds, with no restart.
+- The trust help is current: Firefox 120 and later read the system store, and on Linux the Chromium line names the folder Chromium uses today.
+- When the desktop app is killed, its server no longer leaves `endpoints.json` behind.
+- For the people who build FormNET: two Go modules are new, for Brotli and zstd, both permissive, with rows in `NOTICES.md` and their licence texts in `licenses/`.
+
 ## 0.2.0 · 2026-11-22
 
 The desktop app opens every time, leaves nothing running, and other apps can find FormNET.
