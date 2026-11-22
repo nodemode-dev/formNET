@@ -7,11 +7,15 @@
 //	POST /api/quit                 stop this run cleanly (a newer formnet replacing it asks this)
 //	GET  /api/flows                flows without bodies; filters: host, domain, kind, client, q, since, pending, limit
 //	GET  /api/flows/{id}           one flow with its captured bodies
+//	POST /api/flows/{id}/resend    send an http flow's request again, as captured or edited: {method, url, headers, body_text | body_base64} (any absent field is as captured); answers {id} of the new flow
 //	POST /api/flows/clear          forget every flow
 //	GET  /api/hosts                per-host totals
 //	GET  /api/machine              the latest machine snapshot
 //	GET  /api/proxy                proxy status
 //	POST /api/proxy                {"intercept": bool or "auto"|"on"|"off", "passthrough": [patterns]} (either field), kept in <data>/settings.json
+//	GET  /api/sysproxy             whether the system proxy points at formnet: {supported, reason, enabled, active, address, services, auto_config, error}
+//	POST /api/sysproxy             {"enabled": bool}: set or restore the system proxy now, kept in <data>/settings.json
+//	GET  /api/recipes              lines that send curl, Node.js, Python, Java, Go and git through this run's proxy
 //	GET  /api/ca                   CA info and the trust command
 //	GET  /ca.pem                   the root certificate, for installing trust
 //	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows); credential headers redacted unless secrets=1
@@ -55,6 +59,7 @@ import (
 	"github.com/nodemode-dev/formnet/internal/flow"
 	"github.com/nodemode-dev/formnet/internal/machine"
 	"github.com/nodemode-dev/formnet/internal/proxy"
+	"github.com/nodemode-dev/formnet/internal/sysproxy"
 )
 
 // ProxyControl is what the API needs from the proxy.
@@ -90,8 +95,23 @@ type Deps struct {
 	Quit    func()   // stops the run; nil leaves /api/quit unanswered
 	// Remember keeps a change made through POST /api/proxy for the next start; nil keeps nothing.
 	Remember func(ProxySettings) error
+	// SystemProxy sets and restores the system proxy; nil reports it as not available in this run.
+	SystemProxy SystemProxyControl
+	// BodyLimit bounds the body of a resend request; zero means 256 KiB.
+	BodyLimit int64
 	// Terminals adds the dock's terminal and agent finder routes under /api/terminal; nil adds none.
 	Terminals interface{ Register(mux *http.ServeMux) }
+}
+
+// SystemProxyControl is what the API needs from the system proxy manager.
+type SystemProxyControl interface {
+	Status() sysproxy.Status
+	Set(on bool) sysproxy.Status
+}
+
+// Resender is a proxy that can send a captured request again.
+type Resender interface {
+	Resend(orig flow.Flow, edit proxy.ResendEdit) (string, error)
 }
 
 // Handler builds the API and client handler. It panics without a token,
@@ -109,7 +129,11 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("GET /api/flows", s.listFlows)
 	mux.HandleFunc("GET /api/flows/{id}", s.getFlow)
+	mux.HandleFunc("POST /api/flows/{id}/resend", s.resend)
 	mux.HandleFunc("POST /api/flows/clear", s.clearFlows)
+	mux.HandleFunc("GET /api/sysproxy", s.sysproxyStatus)
+	mux.HandleFunc("POST /api/sysproxy", s.sysproxyUpdate)
+	mux.HandleFunc("GET /api/recipes", s.recipes)
 	mux.HandleFunc("GET /api/hosts", s.hosts)
 	mux.HandleFunc("GET /api/machine", s.machineLatest)
 	mux.HandleFunc("GET /api/proxy", s.proxyStatus)
@@ -277,6 +301,8 @@ type statusBody struct {
 	Machine machineStatus `json:"machine"`
 	Notices []string      `json:"notices"`
 	Now     time.Time     `json:"now"`
+
+	SysProxy sysproxy.Status `json:"sysproxy"`
 }
 
 type machineStatus struct {
@@ -305,7 +331,115 @@ func (s *handler) status(w http.ResponseWriter, r *http.Request) {
 		Machine: machineStatus{Supported: snap.Supported, Source: snap.Source, Taken: snap.Taken, Processes: len(snap.Processes), Connections: len(snap.Connections), Error: snap.Error},
 		Notices: append([]string{}, s.Notices...),
 		Now:     time.Now(),
+
+		SysProxy: s.systemProxy(),
 	})
+}
+
+func (s *handler) systemProxy() sysproxy.Status {
+	if s.SystemProxy == nil {
+		return sysproxy.Status{Reason: "the system proxy is not available in this run", Services: []sysproxy.Service{}}
+	}
+	return s.SystemProxy.Status()
+}
+
+func (s *handler) sysproxyStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.systemProxy())
+}
+
+func (s *handler) sysproxyUpdate(w http.ResponseWriter, r *http.Request) {
+	var u struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&u); err != nil || u.Enabled == nil {
+		writeError(w, http.StatusBadRequest, `body must be JSON: {"enabled": true} or {"enabled": false}`)
+		return
+	}
+	if s.SystemProxy == nil {
+		st := s.systemProxy()
+		st.Error = st.Reason
+		writeJSON(w, http.StatusOK, st)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.SystemProxy.Set(*u.Enabled))
+}
+
+type resendBody struct {
+	Method     *string        `json:"method"`
+	URL        *string        `json:"url"`
+	Headers    *[]flow.Header `json:"headers"`
+	BodyText   *string        `json:"body_text"`
+	BodyBase64 *string        `json:"body_base64"`
+}
+
+func (s *handler) resend(w http.ResponseWriter, r *http.Request) {
+	rs, ok := s.Proxy.(Resender)
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "this proxy cannot send requests again")
+		return
+	}
+	orig, ok := s.Store.Get(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no such flow")
+		return
+	}
+	limit := s.BodyLimit
+	if limit <= 0 {
+		limit = 256 << 10
+	}
+	ceiling := limit*2 + 64<<10
+	raw, err := io.ReadAll(io.LimitReader(r.Body, ceiling+1))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "the request body could not be read")
+		return
+	}
+	if int64(len(raw)) > ceiling {
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("a resend request may be at most %d bytes", ceiling))
+		return
+	}
+	var in resendBody
+	if len(strings.TrimSpace(string(raw))) > 0 {
+		if err := json.Unmarshal(raw, &in); err != nil {
+			writeError(w, http.StatusBadRequest, "body must be JSON with method, url, headers, body_text or body_base64 (each optional)")
+			return
+		}
+	}
+	if in.BodyText != nil && in.BodyBase64 != nil {
+		writeError(w, http.StatusBadRequest, "give body_text or body_base64, not both")
+		return
+	}
+	edit := proxy.ResendEdit{Method: in.Method, URL: in.URL, Headers: in.Headers}
+	if in.BodyText != nil {
+		b := []byte(*in.BodyText)
+		edit.Body = &b
+	}
+	if in.BodyBase64 != nil {
+		b, err := base64.StdEncoding.DecodeString(*in.BodyBase64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "body_base64 is not base64")
+			return
+		}
+		edit.Body = &b
+	}
+	if edit.Body != nil && int64(len(*edit.Body)) > limit {
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("an edited body may be at most %d bytes, the body limit of this run", limit))
+		return
+	}
+	id, err := rs.Resend(orig, edit)
+	var refused *proxy.RefusedError
+	var input *proxy.ResendInputError
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]string{"id": id})
+	case errors.Is(err, proxy.ErrBodyTruncated), errors.Is(err, proxy.ErrNotResendable):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.As(err, &refused):
+		writeError(w, http.StatusForbidden, err.Error())
+	case errors.As(err, &input):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeError(w, http.StatusBadGateway, err.Error())
+	}
 }
 
 func queryFrom(r *http.Request) (flow.Query, error) {
