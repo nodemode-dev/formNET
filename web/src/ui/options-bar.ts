@@ -30,7 +30,8 @@ export class OptionsBar {
       '<span class="cv-sep"></span>' +
       '<button class="cv-btn cv-opt-live" type="button" data-cmd="live" aria-pressed="true"></button>' +
       '<button class="cv-btn" type="button" data-cmd="clear-recording">Clear</button>' +
-      '<a class="cv-btn cv-opt-export" download="formnet.har" title="HAR of the flows matching the text and host filter, as the server applies them">Export HAR</a>' +
+      '<a class="cv-btn cv-opt-export" download="formnet.har" title="HAR of the flows matching the text and host filter, as the server applies them; passwords, tokens and cookies are left out">Export HAR</a>' +
+      '<button class="cv-btn cv-btn-ghost" type="button" data-cmd="export-har-secrets">Export HAR with secrets...</button>' +
       '<span class="cv-opt-counts" aria-live="polite"></span>');
     this.filter = q<HTMLInputElement>(host, 'input.filter');
     this.chip = q<HTMLButtonElement>(host, '.cv-opt-chip');

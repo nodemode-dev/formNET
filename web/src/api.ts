@@ -1,5 +1,5 @@
 import { authHeaders, withToken } from "./session.ts";
-import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, ProxyStatus, Snapshot, Status } from "./types.ts";
+import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, InterceptMode, ProxyStatus, Snapshot, Status } from "./types.ts";
 
 const base = location.origin;
 
@@ -77,9 +77,12 @@ export const api = {
   hosts: () => getJSON<{ hosts: HostSummary[] | null }>("/api/hosts"),
   machine: () => getJSON<Snapshot>("/api/machine"),
   proxy: () => getJSON<ProxyStatus>("/api/proxy"),
-  updateProxy: (u: { intercept?: boolean; passthrough?: string[] }) => postJSON<ProxyStatus>("/api/proxy", u),
+  updateProxy: (u: { intercept?: InterceptMode; passthrough?: string[] }) => postJSON<ProxyStatus>("/api/proxy", u),
   ca: () => getJSON<CAInfo>("/api/ca"),
-  harURL: (f: FlowFilter) => withToken(`${base}/api/export/har${filterQuery(f)}`),
+  harURL: (f: FlowFilter, secrets = false) => {
+    const q = filterQuery(f);
+    return withToken(`${base}/api/export/har${q}${secrets ? `${q ? "&" : "?"}secrets=1` : ""}`);
+  },
   caURL: () => withToken(`${base}/ca.pem`),
 };
 
