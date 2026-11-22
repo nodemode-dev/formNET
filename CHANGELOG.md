@@ -2,6 +2,18 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.4.0 · 2026-11-22
+
+Nothing in the window flashes, jumps or loses what you typed, and the window has the choices 0.3.0's server made possible.
+
+- Setup keeps what you type. The Passthrough box used to be emptied every ten seconds while you were typing in it.
+- The Machine and Hosts views hold still. Rows update in place, keep their order between samples, and keep your scroll position and focus; the Machine view re-sorts when you press a sort button.
+- A flow's detail no longer jumps while a slow request completes.
+- HTTPS is a choice of Auto, On or Off, in Setup and in Preferences.
+- File has "Export HAR with secrets...", which asks first. "Export HAR..." leaves passwords, tokens and cookies out.
+- A refused flow shows in red, with the reason and a button that adds the host to the passthrough list.
+- A body says how it was sent and whether FormNET decoded it.
+
 ## 0.3.0 · 2026-11-22
 
 What FormNET records is honest, and what it exports is safe to share. This version carries the server's side; the window's new choices for it arrive in 0.4.0.
