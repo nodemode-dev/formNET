@@ -12,6 +12,7 @@ import { ThrottleSection } from './panels/throttle';
 import { DevicesSection } from './panels/devices';
 import type { RuleActionType } from '../types-traffic';
 import { SystemProxySection } from './panels/system-proxy';
+import { UpstreamSection } from './panels/upstream';
 import { MACHINE_SORTS, PREFIX, UI_FONT_SIZES, UI_SCALES, loadPrefs, savePrefs, setUiScale, uiScaleChoice, type MachineSort, type Prefs, type UiFontSize } from './prefs';
 import { STORAGE_KEY, THEMES, readChoice, setAccent, setIntensity, setTheme, themeSwatchesHtml } from './themes';
 
@@ -73,6 +74,7 @@ export class SettingsDialog extends Dialog {
   private readonly passthrough: PassthroughSection;
   private readonly proxy: ProxySection;
   private readonly sysproxy: SystemProxySection;
+  private readonly upstream: UpstreamSection;
   private readonly agents = new AgentsSection();
   private readonly rules: RulesSection;
   private readonly bpSettings = new BreakpointSettingsSection();
@@ -86,6 +88,7 @@ export class SettingsDialog extends Dialog {
     this.passthrough = new PassthroughSection(deps.store);
     this.proxy = new ProxySection(deps.store);
     this.sysproxy = new SystemProxySection(deps.store);
+    this.upstream = new UpstreamSection(deps.store);
     this.rules = new RulesSection(deps.store);
     this.throttle = new ThrottleSection(deps.store);
     this.devices = new DevicesSection(deps.store);
@@ -151,7 +154,8 @@ export class SettingsDialog extends Dialog {
       grp('HTTPS', this.https.el),
       grp('Root Certificate', this.root.el),
       grp('Passthrough', this.passthrough.el),
-      grp('Proxy', this.proxy.el));
+      grp('Proxy', this.proxy.el),
+      grp('Upstream Proxy', this.upstream.el));
     add('Machine',
       grp('Sampling', nt('The connection table is read every FORMNET_MACHINE_INTERVAL (2 s unless set), with the tools the system already has: lsof, ps and nettop on macOS, /proc on Linux, netstat on Windows. No privileges are needed. Reverse DNS is off unless FORMNET_REVERSE_DNS=1, and a name is shown only when it resolves back to the address.')),
       grp('Display', this.machineSortRow.el, nt('The order the process list opens in; the buttons above the list change it for the session.')));
@@ -255,6 +259,7 @@ export class SettingsDialog extends Dialog {
     this.passthrough.refresh(status);
     this.proxy.refresh(status);
     this.sysproxy.refresh(status);
+    this.upstream.refresh(status);
     this.agents.refresh(status);
     this.rules.refresh(status);
     this.bpSettings.refresh(status);

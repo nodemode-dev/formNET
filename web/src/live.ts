@@ -4,6 +4,8 @@ import { mountBreakpointPanel } from './ui/breakpoint-dialog.ts';
 import type { Store } from './state.ts';
 import { applyFlowEvents, withFlows } from './state.ts';
 import type { FlowEvent } from './types.ts';
+import { flowQuery } from './filters.ts';
+import { emitMessageEvent } from './ui/ws-messages.ts';
 
 /** Connects the store to the server: the event stream, the status, the hosts and the first machine sample. Stream
  *  events are collected and applied once per animation frame. Returns the way to stop. */
@@ -48,6 +50,7 @@ export function connectLive(store: Store, onLost: () => void): () => void {
       const epoch = hello.epoch ?? '';
       store.update({ connected: true, epoch });
       reloadFlows();
+      flowQuery()?.reload();
       if (s.epoch && epoch === s.epoch && hello.dropped) store.update({ notice: `${hello.dropped} events were missed; reloaded` });
       refreshStatus();
       refreshHosts();
@@ -55,12 +58,13 @@ export function connectLive(store: Store, onLost: () => void): () => void {
       breakpointWatch.start();
       breakpointWatch.refresh();
     },
-    resync: () => { pending = []; reloadFlows(); },
+    resync: () => { pending = []; reloadFlows(); flowQuery()?.reload(); },
     close: () => store.update({ connected: false }),
     unauthorized: lostSession,
     flow: (e) => { pending = [...pending, e]; if (!frame) frame = requestAnimationFrame(flush); if (e.flow) breakpointWatch.sawFlow(e.flow); },
     machine: (machine) => store.update({ machine }),
     breakpoint: (e) => breakpointWatch.event(e),
+    message: (e) => emitMessageEvent(e),
   });
   const timer = window.setInterval(() => { if (document.visibilityState === 'visible' && !store.get().sessionLost) refreshStatus(); }, 10000);
   const stop = (): void => { stopStream(); window.clearInterval(timer); breakpointWatch.stop(); };
