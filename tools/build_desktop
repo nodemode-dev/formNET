@@ -7,7 +7,7 @@ usage() {
   cat << 'EOF'
 usage: tools/build_desktop VERSION SERVER_BINARY [--debug] [--bundles LIST] [--clean] [--yes] [--config JSON]
 
-Bundles the formnet desktop app around a server binary that ./build_app has just compiled.
+Bundles the FormNET desktop app around a server binary that ./build_app has just compiled.
 Run ./build_app rather than this script.
 EOF
 }
