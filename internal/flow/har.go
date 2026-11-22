@@ -19,7 +19,41 @@ type HAR struct {
 type harLog struct {
 	Version string     `json:"version"`
 	Creator harCreator `json:"creator"`
+	Comment string     `json:"comment,omitempty"`
 	Entries []harEntry `json:"entries"`
+}
+
+// HAROptions choose what an export carries. The zero value redacts secrets.
+type HAROptions struct {
+	// Secrets keeps the values of the headers that carry credentials as captured.
+	Secrets bool
+}
+
+const (
+	harCommentRedacted = "Exported by FormNET with secrets redacted: the values of the Authorization, Proxy-Authorization, Cookie and Set-Cookie headers read [redacted] and the cookies lists are empty. Query strings and request bodies are as captured."
+	harCommentSecrets  = "Exported by FormNET with secrets: every header is as captured, including Authorization, Proxy-Authorization, Cookie and Set-Cookie."
+	redacted           = "[redacted]"
+)
+
+func (o HAROptions) comment() string {
+	if o.Secrets {
+		return harCommentSecrets
+	}
+	return harCommentRedacted
+}
+
+// secretHeader names the headers whose values a default export redacts.
+func secretHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "authorization", "proxy-authorization", "cookie", "set-cookie":
+		return true
+	}
+	return false
+}
+
+// harSkips reports flows with no HTTP shape: tunnels and refused handshakes.
+func harSkips(f Flow) bool {
+	return f.Kind == KindTunnel || f.Kind == KindRefused
 }
 
 type harCreator struct {
@@ -91,19 +125,25 @@ type harTimings struct {
 	SSL     float64 `json:"ssl"`
 }
 
-// ToHAR converts HTTP flows to a HAR document. Tunnels have no HTTP shape and are left out.
+// ToHAR converts HTTP flows to a HAR document with secrets redacted. Tunnels
+// and refused handshakes have no HTTP shape and are left out.
 func ToHAR(flows []Flow, creatorVersion string) HAR {
-	entries := make([]harEntry, 0, len(flows))
-	for _, f := range flows {
-		if f.Kind == KindTunnel {
-			continue
-		}
-		entries = append(entries, toEntry(f))
-	}
-	return HAR{Log: harLog{Version: "1.2", Creator: harCreator{Name: "formnet", Version: creatorVersion}, Entries: entries}}
+	return ToHARWith(flows, creatorVersion, HAROptions{})
 }
 
-// MarshalHAR writes flows as indented HAR JSON.
+// ToHARWith converts HTTP flows to a HAR document as opt says.
+func ToHARWith(flows []Flow, creatorVersion string, opt HAROptions) HAR {
+	entries := make([]harEntry, 0, len(flows))
+	for _, f := range flows {
+		if harSkips(f) {
+			continue
+		}
+		entries = append(entries, toEntry(f, opt))
+	}
+	return HAR{Log: harLog{Version: "1.2", Creator: harCreator{Name: "formnet", Version: creatorVersion}, Comment: opt.comment(), Entries: entries}}
+}
+
+// MarshalHAR writes flows as indented HAR JSON with secrets redacted.
 func MarshalHAR(flows []Flow, creatorVersion string) ([]byte, error) {
 	return json.MarshalIndent(ToHAR(flows, creatorVersion), "", "  ")
 }
@@ -113,27 +153,37 @@ func MarshalHAR(flows []Flow, creatorVersion string) ([]byte, error) {
 type HARWriter struct {
 	w     io.Writer
 	enc   *json.Encoder
+	opt   HAROptions
 	count int
 	err   error
 }
 
-// NewHARWriter writes the document head and returns a writer for entries.
+// NewHARWriter writes the head of a document with secrets redacted and returns a writer for entries.
 func NewHARWriter(w io.Writer, creatorVersion string) (*HARWriter, error) {
+	return NewHARWriterWith(w, creatorVersion, HAROptions{})
+}
+
+// NewHARWriterWith writes the document head and returns a writer for entries, as opt says.
+func NewHARWriterWith(w io.Writer, creatorVersion string, opt HAROptions) (*HARWriter, error) {
 	head, err := json.Marshal(harCreator{Name: "formnet", Version: creatorVersion})
 	if err != nil {
 		return nil, err
 	}
-	if _, err := fmt.Fprintf(w, "{\n  \"log\": {\n    \"version\": \"1.2\",\n    \"creator\": %s,\n    \"entries\": [", head); err != nil {
+	comment, err := json.Marshal(opt.comment())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fmt.Fprintf(w, "{\n  \"log\": {\n    \"version\": \"1.2\",\n    \"creator\": %s,\n    \"comment\": %s,\n    \"entries\": [", head, comment); err != nil {
 		return nil, err
 	}
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	return &HARWriter{w: w, enc: enc}, nil
+	return &HARWriter{w: w, enc: enc, opt: opt}, nil
 }
 
-// Write adds one flow; tunnels are skipped.
+// Write adds one flow; tunnels and refused handshakes are skipped.
 func (h *HARWriter) Write(f Flow) error {
-	if h.err != nil || f.Kind == KindTunnel {
+	if h.err != nil || harSkips(f) {
 		return h.err
 	}
 	sep := "\n"
@@ -144,7 +194,7 @@ func (h *HARWriter) Write(f Flow) error {
 		h.err = err
 		return err
 	}
-	if err := h.enc.Encode(toEntry(f)); err != nil {
+	if err := h.enc.Encode(toEntry(f, h.opt)); err != nil {
 		h.err = err
 		return err
 	}
@@ -161,7 +211,7 @@ func (h *HARWriter) Close() error {
 	return h.err
 }
 
-func toEntry(f Flow) harEntry {
+func toEntry(f Flow, opt HAROptions) harEntry {
 	clientProto := f.ClientProtocol
 	if clientProto == "" {
 		clientProto = f.Protocol
@@ -171,7 +221,7 @@ func toEntry(f Flow) harEntry {
 		URL:         f.URL,
 		HTTPVersion: clientProto,
 		Cookies:     []harNameValue{},
-		Headers:     nameValues(f.Request.Headers),
+		Headers:     nameValues(f.Request.Headers, opt),
 		QueryString: queryValues(f.Query),
 		HeadersSize: sizeOrUnknown(f.Request.HeaderBytes),
 		BodySize:    f.Request.BodyBytes,
@@ -192,7 +242,7 @@ func toEntry(f Flow) harEntry {
 		Content:     harContent{Size: 0, MimeType: ""},
 	}
 	if f.Response != nil {
-		res.Headers = nameValues(f.Response.Headers)
+		res.Headers = nameValues(f.Response.Headers, opt)
 		res.HeadersSize = sizeOrUnknown(f.Response.HeaderBytes)
 		res.BodySize = f.Response.BodyBytes
 		res.Content = harContent{Size: contentSize(*f.Response), MimeType: f.Response.ContentType}
@@ -254,10 +304,13 @@ func bodyComment(enc string, m Message) string {
 	return strings.Join(notes, "; ")
 }
 
-func nameValues(h []Header) []harNameValue {
+func nameValues(h []Header, opt HAROptions) []harNameValue {
 	out := make([]harNameValue, len(h))
 	for i, x := range h {
 		out[i] = harNameValue{Name: x.Name, Value: x.Value}
+		if !opt.Secrets && secretHeader(x.Name) {
+			out[i].Value = redacted
+		}
 	}
 	return out
 }

@@ -11,10 +11,10 @@
 //	GET  /api/hosts                per-host totals
 //	GET  /api/machine              the latest machine snapshot
 //	GET  /api/proxy                proxy status
-//	POST /api/proxy                {"intercept": bool, "passthrough": [patterns]} (either field)
+//	POST /api/proxy                {"intercept": bool or "auto"|"on"|"off", "passthrough": [patterns]} (either field), kept in <data>/settings.json
 //	GET  /api/ca                   CA info and the trust command
 //	GET  /ca.pem                   the root certificate, for installing trust
-//	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows)
+//	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows); credential headers redacted unless secrets=1
 //	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, machine.snapshot, ping
 //	GET  /                         the web client
 //
@@ -22,8 +22,8 @@
 // rebinding guard). Cross-site requests from a browser are refused on every
 // route but the page itself. The API, the stream and the certificate need
 // the run's token: the page is opened once at /?token=<token> (printed by
-// `formnet serve`, or passed by the desktop app), keeps it in memory and
-// sends it as `Authorization: Bearer <token>`; the event stream and the
+// `formnet serve`, or passed by the desktop app), keeps it in sessionStorage
+// and sends it as `Authorization: Bearer <token>`; the event stream and the
 // downloads, which cannot set headers, pass it as a `token` query parameter.
 // There is no cookie on purpose: a browser sends a cookie for 127.0.0.1 to
 // every port, so a cookie would reach any other local server the person
@@ -87,6 +87,8 @@ type Deps struct {
 	Log     *slog.Logger
 	Notices []string // what the person should know about this start, such as a moved port
 	Quit    func()   // stops the run; nil leaves /api/quit unanswered
+	// Remember keeps a change made through POST /api/proxy for the next start; nil keeps nothing.
+	Remember func(ProxySettings) error
 }
 
 // Handler builds the API and client handler. It panics without a token,
@@ -343,13 +345,15 @@ type body struct {
 	Base64    string `json:"base64,omitempty"`
 	Bytes     int    `json:"bytes"`
 	Truncated bool   `json:"truncated"`
+	Decoded   bool   `json:"decoded"`  // the text is the decoded form of Encoding
+	Encoding  string `json:"encoding"` // the Content-Encoding as sent
 }
 
 func encodeBody(m *flow.Message) *body {
 	if m == nil || len(m.Body) == 0 {
 		return nil
 	}
-	b := &body{Bytes: len(m.Body), Truncated: m.BodyTruncated}
+	b := &body{Bytes: len(m.Body), Truncated: m.BodyTruncated, Decoded: m.Decoded, Encoding: m.Encoding}
 	if utf8.Valid(m.Body) && !hasControl(m.Body) {
 		b.Text = string(m.Body)
 	} else {
@@ -401,8 +405,38 @@ func (s *handler) proxyStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 type proxyUpdate struct {
-	Intercept   *bool    `json:"intercept"`
-	Passthrough []string `json:"passthrough"`
+	Intercept   json.RawMessage `json:"intercept"`
+	Passthrough []string        `json:"passthrough"`
+}
+
+// ProxySettings is a change made through POST /api/proxy; a nil field did not change.
+type ProxySettings struct {
+	Intercept   *string  // auto, on or off
+	Passthrough []string // nil: unchanged
+}
+
+// modeSetter is a proxy that also takes the auto mode.
+type modeSetter interface {
+	SetInterceptMode(mode string) error
+}
+
+// interceptMode reads intercept as a boolean (true is on) or as "auto", "on" or "off".
+func interceptMode(raw json.RawMessage) (string, error) {
+	var on bool
+	if err := json.Unmarshal(raw, &on); err == nil {
+		if on {
+			return proxy.ModeOn, nil
+		}
+		return proxy.ModeOff, nil
+	}
+	var mode string
+	if err := json.Unmarshal(raw, &mode); err == nil {
+		switch mode = strings.ToLower(strings.TrimSpace(mode)); mode {
+		case proxy.ModeAuto, proxy.ModeOn, proxy.ModeOff:
+			return mode, nil
+		}
+	}
+	return "", errors.New(`intercept must be true, false, "auto", "on" or "off"`)
 }
 
 func (s *handler) proxyUpdate(w http.ResponseWriter, r *http.Request) {
@@ -411,8 +445,27 @@ func (s *handler) proxyUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "body must be JSON with intercept and/or passthrough")
 		return
 	}
-	if u.Intercept != nil {
-		s.Proxy.SetIntercept(*u.Intercept)
+	var change ProxySettings
+	if len(u.Intercept) > 0 && string(u.Intercept) != "null" {
+		mode, err := interceptMode(u.Intercept)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		change.Intercept = &mode
+	}
+	if change.Intercept != nil {
+		if ms, ok := s.Proxy.(modeSetter); ok {
+			if err := ms.SetInterceptMode(*change.Intercept); err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		} else if *change.Intercept == proxy.ModeAuto {
+			writeError(w, http.StatusBadRequest, "this proxy takes intercept on or off only")
+			return
+		} else {
+			s.Proxy.SetIntercept(*change.Intercept == proxy.ModeOn)
+		}
 	}
 	if u.Passthrough != nil {
 		clean := make([]string, 0, len(u.Passthrough))
@@ -428,6 +481,12 @@ func (s *handler) proxyUpdate(w http.ResponseWriter, r *http.Request) {
 			clean = append(clean, p)
 		}
 		s.Proxy.SetPassthrough(clean)
+		change.Passthrough = clean
+	}
+	if s.Remember != nil && (change.Intercept != nil || change.Passthrough != nil) {
+		if err := s.Remember(change); err != nil {
+			s.Log.Warn("settings file", "err", err)
+		}
 	}
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
 }
@@ -459,7 +518,7 @@ func (s *handler) exportHAR(w http.ResponseWriter, r *http.Request) {
 	name := "formnet-" + time.Now().UTC().Format("20060102-150405") + ".har"
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
-	hw, err := flow.NewHARWriter(w, app.Version)
+	hw, err := flow.NewHARWriterWith(w, app.Version, flow.HAROptions{Secrets: r.URL.Query().Get("secrets") == "1"})
 	if err != nil {
 		s.Log.Warn("har export", "err", err)
 		return
@@ -538,7 +597,7 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 const csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; frame-ancestors 'none'"
 
 // client serves the embedded web client. The page and its files are static
-// and need no session; the page reads ?token= itself and keeps it in memory.
+// and need no session; the page reads ?token= itself and keeps it in sessionStorage.
 // A wrong token on the page is refused so a typo is noticed at once. Paths
 // without a file fall back to index.html so the page can own its routes.
 func (s *handler) client() http.Handler {

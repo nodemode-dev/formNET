@@ -40,7 +40,8 @@
     ],
     "resources": {
       "../LICENSE": "LICENSE",
-      "../NOTICES.md": "NOTICES.md"
+      "../NOTICES.md": "NOTICES.md",
+      "../licenses": "licenses"
     },
     "icon": [
       "icons/32x32.png",
