@@ -7,10 +7,10 @@
 //	FORMNET_PROXY_ADDR   loopback address of the intercepting proxy; default 127.0.0.1:8761
 //	FORMNET_BODY_LIMIT   bytes of each request and response body kept; default 262144
 //	FORMNET_FLOW_LIMIT   flows kept in memory before the oldest are dropped; default 5000
-//	FORMNET_PASSTHROUGH  comma-separated host patterns tunnelled without interception
+//	FORMNET_PASSTHROUGH  comma-separated host patterns tunnelled without interception; when set, wins over <data>/settings.json
 //	FORMNET_MACHINE_INTERVAL  seconds between machine snapshots; default 2
 //	FORMNET_REVERSE_DNS  1 to look up names for remote addresses in the machine view; default off
-//	FORMNET_INTERCEPT    auto (open HTTPS only when the root is trusted), on, or off; default auto
+//	FORMNET_INTERCEPT    auto (open HTTPS only while the root is trusted), on, or off; when set, wins over <data>/settings.json; default auto
 //	FORMNET_TOKEN        this run's session token; default a new random one, written to <data>/token
 //	FORMNET_DESKTOP      set by the desktop app; the server stops when its stdin closes
 package config
@@ -45,6 +45,8 @@ type Config struct {
 	MachineInterval time.Duration
 	ReverseDNS      bool
 	Intercept       string // auto, on, off
+	InterceptSet    bool   // FORMNET_INTERCEPT was set: it wins over <data>/settings.json for this run
+	PassthroughSet  bool   // FORMNET_PASSTHROUGH was set: it wins over <data>/settings.json for this run
 	Token           string // empty means make one
 	Desktop         bool
 }
@@ -99,6 +101,8 @@ func load(getenv func(string) string, home func() (string, error)) (Config, erro
 		Data:            data,
 		ReverseDNS:      truthy(getenv("FORMNET_REVERSE_DNS")),
 		Intercept:       intercept,
+		InterceptSet:    strings.TrimSpace(getenv("FORMNET_INTERCEPT")) != "",
+		PassthroughSet:  strings.TrimSpace(getenv("FORMNET_PASSTHROUGH")) != "",
 		Token:           token,
 		Addr:            addr,
 		ProxyAddr:       proxyAddr,
