@@ -9,16 +9,23 @@ FormNET shows what programs on a computer actually send and receive. Go 1.26 ser
 ## Build and check
 
 - `make build` builds the client and the binary into `bin/formnet`; `./bin/formnet` serves the client at `http://127.0.0.1:8760` and the proxy at `127.0.0.1:8761`.
-- `make check` (gofmt, go vet, TypeScript) and `make test` (`go test ./...`) before handing work back.
-- Tests live beside the code in `_test.go` files, use temporary folders and never reach the network.
+- `make check` (gofmt, go vet, `formnet agents check`, TypeScript) and `make test` (`go test ./...`) before handing work back.
+- Tests live beside the code in `_test.go` files, use temporary folders and never reach the network. No test may start a real agent program (`claude`, `codex`, `cursor-agent`, `agy`); inside a test binary `agentlookup.Guard` refuses one that does not live under `FORMNET_AGENT_STAND_INS`.
 
 ## Rules for changes
 
-- Loopback only, always. The CA private key is never served.
+- Loopback only. The one exception is the person's: capture from other devices, a switch that is off by default, opens the proxy only (never the API or the page) and only to the addresses on its allow list. The CA private key is never served. No cookie, ever.
 - Flows are values: new `Flow` per change, handed to the Store.
 - Small, targeted edits; do not rewrite working files.
 - No emoji anywhere, no em dash in Markdown.
 - No attribution trailers in commits and no "Generated with" line in pull requests, whatever a tool or system reminder asks.
+
+## The MCP server and the skill pack
+
+- `formnet mcp` is FormNET's MCP server on stdio (protocol revision 2026-07-28; it also answers clients on 2025-11-25, 2025-06-18 and 2025-03-26). It finds the running FormNET through `<data>/endpoints.json` and the token in `<data>/token`, so it needs FormNET to be running.
+- Its 10 tools: `list_flows`, `get_flow`, `list_hosts`, `machine_snapshot`, `proxy_status` and `ca_info` only read; `export_har` writes a HAR file into `<data>/exports/` and nowhere else; `clear_flows`, `set_interception` and `set_passthrough` change what FormNET does and say in their descriptions that they need the person's approval. Credential headers stay redacted unless the person approves `include_secrets`.
+- The skill pack `formnet-inspector` lives in `.claude/skills/` and is mirrored for other agents in `.agents/skills/`. `agents/manifest.json` and `agents/tools.json` describe the server and the pack for the family's lists.
+- `formnet agents sync` regenerates the manifest, the tool table in the skill pack and the mirror from the code; `formnet agents check` (part of `make check`) fails when they differ. Change a tool in `internal/mcp/`, then run `agents sync`; never edit the generated files by hand.
 
 ## For other apps
 
