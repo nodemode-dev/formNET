@@ -1,0 +1,68 @@
+{
+  "format": "form-agent-manifest",
+  "version": 1,
+  "app": "formNET",
+  "mcp": {
+    "protocol": "2026-07-28",
+    "legacy_protocols": [
+      "2025-11-25",
+      "2025-06-18",
+      "2025-03-26"
+    ],
+    "command": [
+      "formnet",
+      "mcp"
+    ],
+    "transports": [
+      "stdio"
+    ],
+    "count": 10,
+    "tools": [
+      "list_flows",
+      "get_flow",
+      "list_hosts",
+      "machine_snapshot",
+      "proxy_status",
+      "ca_info",
+      "export_har",
+      "clear_flows",
+      "set_interception",
+      "set_passthrough"
+    ],
+    "read_only": [
+      "list_flows",
+      "get_flow",
+      "list_hosts",
+      "machine_snapshot",
+      "proxy_status",
+      "ca_info"
+    ],
+    "writes_confined": [
+      "export_har"
+    ],
+    "approval_gated": [
+      "clear_flows",
+      "set_interception",
+      "set_passthrough"
+    ]
+  },
+  "skills_root": ".claude/skills",
+  "skills_mirror": ".agents/skills",
+  "skills": [
+    {
+      "folder": "formnet-inspector",
+      "name": "formnet-inspector",
+      "description": "Drives FormNET, the local network inspector, to see what a program or agent actually sends and receives. Use whenever the person wants to route a program, script, Node or Go service or coding agent through the FormNET proxy, find the running FormNET, trust or untrust its root certificate, read recorded requests and responses through the API or the FormNET MCP tools, export a HAR file, read the machine's connection table, or fix a program that refuses the proxy because it pins certificates. Trigger on FormNET, formnet, HTTPS_PROXY, NODE_EXTRA_CA_CERTS, NODE_USE_ENV_PROXY, what is this app sending, record this traffic, intercept HTTPS locally, list_flows, export_har, formnet snapshot, endpoints.json, or a flow of kind refused. Not for packet capture with Wireshark or tcpdump, not for remote servers or production traffic, and not for changing FormNET's own source code, which the repository's agent instructions cover.",
+      "sub_skills": [
+        "export-har",
+        "find-formnet",
+        "machine-table",
+        "pinned-programs",
+        "read-flows",
+        "route-traffic",
+        "trust-root"
+      ],
+      "files": 12
+    }
+  ]
+}

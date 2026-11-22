@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "formnet": {
+      "type": "stdio",
+      "command": "formnet",
+      "args": ["mcp"]
+    }
+  }
+}

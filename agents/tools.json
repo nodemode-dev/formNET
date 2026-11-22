@@ -1,0 +1,1126 @@
+{
+  "protocol": "2026-07-28",
+  "tools": [
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List recorded flows"
+      },
+      "description": "Read-only. Lists the exchanges FormNET's proxy recorded, newest last, without headers or bodies: method, URL, status, kind, sizes, timing and the process that sent it. Use it to see what a program sent, to find a flow id for get_flow, or to poll for new traffic by passing the last_seq of the previous answer as since. Filters are those of the FormNET API (host, domain, kind, client, q, since, pending); limit defaults to 25 and returns the newest matches. Kind refused lists programs that rejected FormNET's certificate.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Only flows from a client address starting with this ip:port prefix, as list_flows shows it in client.",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "domain": {
+            "description": "Only flows whose host belongs to this registrable domain, such as example.com (it covers its subdomains).",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "host": {
+            "description": "Only flows to this host: an exact name such as api.example.com, or a *.suffix pattern such as *.example.com.",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "kind": {
+            "description": "Only flows of this kind: http (opened, with headers and bodies), websocket, tunnel (HTTPS passed through and only counted) or refused (the program refused FormNET's certificate, usually because it pins certificates).",
+            "enum": [
+              "http",
+              "websocket",
+              "tunnel",
+              "refused"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "description": "How many of the newest matching flows to return, 1 to 200.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "pending": {
+            "description": "true for exchanges still in progress, false for finished ones; leave out for both.",
+            "type": "boolean"
+          },
+          "q": {
+            "description": "Case-insensitive text found in the URL, method, status code, process name or response content type.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "since": {
+            "description": "Only flows with a seq greater than this. Pass the highest seq of the last answer to read only what arrived after it.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_flows",
+      "outputSchema": {
+        "properties": {
+          "flows": {
+            "items": {
+              "properties": {
+                "bytes_received": {
+                  "description": "Bytes from the server towards the program.",
+                  "type": "integer"
+                },
+                "bytes_sent": {
+                  "description": "Bytes from the program towards the server.",
+                  "type": "integer"
+                },
+                "client": {
+                  "description": "ip:port of the program that used the proxy.",
+                  "type": "string"
+                },
+                "client_pid": {
+                  "description": "Process id behind the client port, 0 when unknown.",
+                  "type": "integer"
+                },
+                "client_process": {
+                  "description": "Process name behind the client port, empty when unknown.",
+                  "type": "string"
+                },
+                "content_type": {
+                  "description": "Response content type.",
+                  "type": "string"
+                },
+                "duration_ms": {
+                  "description": "Milliseconds from start to end.",
+                  "type": "number"
+                },
+                "error": {
+                  "description": "Transport error or refusal reason, empty when none.",
+                  "type": "string"
+                },
+                "host": {
+                  "description": "The host without its port.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The flow id; pass it to get_flow.",
+                  "type": "string"
+                },
+                "intercepted": {
+                  "description": "True when FormNET saw inside the exchange; false for HTTPS that was only counted.",
+                  "type": "boolean"
+                },
+                "kind": {
+                  "description": "http, websocket, tunnel or refused.",
+                  "type": "string"
+                },
+                "method": {
+                  "description": "HTTP method, or CONNECT for a tunnel.",
+                  "type": "string"
+                },
+                "pending": {
+                  "description": "True while the exchange is still in progress.",
+                  "type": "boolean"
+                },
+                "seq": {
+                  "description": "Arrival order; pass the highest one as since to read newer flows.",
+                  "type": "integer"
+                },
+                "start": {
+                  "description": "When the exchange began, RFC 3339 UTC.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "HTTP status, 0 when there is none.",
+                  "type": "integer"
+                },
+                "url": {
+                  "description": "The full URL, or host:port for a tunnel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "seq",
+                "kind",
+                "start",
+                "pending",
+                "method",
+                "url",
+                "host",
+                "status",
+                "client",
+                "client_pid",
+                "client_process",
+                "content_type",
+                "bytes_sent",
+                "bytes_received",
+                "duration_ms",
+                "intercepted",
+                "error"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "last_seq": {
+            "description": "Highest seq in this answer, 0 when empty; pass it as since next time.",
+            "type": "integer"
+          },
+          "recorded": {
+            "description": "Flows FormNET holds in all.",
+            "type": "integer"
+          },
+          "returned": {
+            "description": "Flows in this answer.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "flows",
+          "returned",
+          "recorded",
+          "last_seq"
+        ],
+        "type": "object"
+      },
+      "title": "List recorded flows"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Get one flow"
+      },
+      "description": "Read-only. Returns one recorded exchange by id: request and response headers, timing, TLS details and the captured bodies. Use it after list_flows to read what a request actually carried or what came back. Bodies are cut to max_body_bytes (default 8192, at most 65536) and flagged truncated when cut, as text when UTF-8 and base64 otherwise. Authorization, Proxy-Authorization, Cookie and Set-Cookie values always read [redacted].",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The flow id from list_flows.",
+            "pattern": "^[0-9a-f]{1,64}$",
+            "type": "string"
+          },
+          "include_bodies": {
+            "default": true,
+            "description": "false to leave both bodies out and read only headers and timing.",
+            "type": "boolean"
+          },
+          "max_body_bytes": {
+            "default": 8192,
+            "description": "Bytes of each body to show, 0 to 65536.",
+            "maximum": 65536,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "get_flow",
+      "outputSchema": {
+        "properties": {
+          "bytes_received": {
+            "description": "Bytes from the server towards the program.",
+            "type": "integer"
+          },
+          "bytes_sent": {
+            "description": "Bytes from the program towards the server.",
+            "type": "integer"
+          },
+          "client": {
+            "description": "ip:port of the program that used the proxy.",
+            "type": "string"
+          },
+          "client_pid": {
+            "description": "Process id behind the client port, 0 when unknown.",
+            "type": "integer"
+          },
+          "client_process": {
+            "description": "Process name behind the client port, empty when unknown.",
+            "type": "string"
+          },
+          "client_protocol": {
+            "description": "What the program sent to the proxy.",
+            "type": "string"
+          },
+          "connect_ms": {
+            "description": "Dial plus TLS to the server, in milliseconds.",
+            "type": "number"
+          },
+          "content_type": {
+            "description": "Response content type.",
+            "type": "string"
+          },
+          "duration_ms": {
+            "description": "Milliseconds from start to end.",
+            "type": "number"
+          },
+          "error": {
+            "description": "Transport error or refusal reason, empty when none.",
+            "type": "string"
+          },
+          "host": {
+            "description": "The host without its port.",
+            "type": "string"
+          },
+          "id": {
+            "description": "The flow id; pass it to get_flow.",
+            "type": "string"
+          },
+          "intercepted": {
+            "description": "True when FormNET saw inside the exchange; false for HTTPS that was only counted.",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "http, websocket, tunnel or refused.",
+            "type": "string"
+          },
+          "method": {
+            "description": "HTTP method, or CONNECT for a tunnel.",
+            "type": "string"
+          },
+          "pending": {
+            "description": "True while the exchange is still in progress.",
+            "type": "boolean"
+          },
+          "protocol": {
+            "description": "What the server answered with, such as HTTP/2.0.",
+            "type": "string"
+          },
+          "request": {
+            "properties": {
+              "body": {
+                "description": "A captured body, null when there was none. truncated is true when shown_bytes is less than the full body: either this tool cut it (raise max_body_bytes) or FormNET kept only a prefix (capture_truncated).",
+                "properties": {
+                  "base64": {
+                    "description": "The body as base64, when it is binary.",
+                    "type": "string"
+                  },
+                  "capture_truncated": {
+                    "description": "True when FormNET kept only a prefix (FORMNET_BODY_LIMIT).",
+                    "type": "boolean"
+                  },
+                  "captured_bytes": {
+                    "description": "Bytes FormNET kept.",
+                    "type": "integer"
+                  },
+                  "decoded": {
+                    "description": "True when the text is the decoded form of the Content-Encoding.",
+                    "type": "boolean"
+                  },
+                  "encoding": {
+                    "description": "The Content-Encoding as sent.",
+                    "type": "string"
+                  },
+                  "shown_bytes": {
+                    "description": "Bytes shown here.",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "description": "The body as text, when it is valid UTF-8.",
+                    "type": "string"
+                  },
+                  "truncated": {
+                    "description": "True when less than the whole body is shown.",
+                    "type": "boolean"
+                  },
+                  "wire_bytes": {
+                    "description": "Bytes that crossed the wire.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "shown_bytes",
+                  "captured_bytes",
+                  "wire_bytes",
+                  "truncated",
+                  "capture_truncated",
+                  "decoded",
+                  "encoding"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "headers": {
+                "items": {
+                  "properties": {
+                    "name": {
+                      "description": "Header name.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Header value; credential headers read [redacted].",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "headers"
+            ],
+            "type": "object"
+          },
+          "response": {
+            "description": "Null until a response arrived.",
+            "properties": {
+              "body": {
+                "description": "A captured body, null when there was none. truncated is true when shown_bytes is less than the full body: either this tool cut it (raise max_body_bytes) or FormNET kept only a prefix (capture_truncated).",
+                "properties": {
+                  "base64": {
+                    "description": "The body as base64, when it is binary.",
+                    "type": "string"
+                  },
+                  "capture_truncated": {
+                    "description": "True when FormNET kept only a prefix (FORMNET_BODY_LIMIT).",
+                    "type": "boolean"
+                  },
+                  "captured_bytes": {
+                    "description": "Bytes FormNET kept.",
+                    "type": "integer"
+                  },
+                  "decoded": {
+                    "description": "True when the text is the decoded form of the Content-Encoding.",
+                    "type": "boolean"
+                  },
+                  "encoding": {
+                    "description": "The Content-Encoding as sent.",
+                    "type": "string"
+                  },
+                  "shown_bytes": {
+                    "description": "Bytes shown here.",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "description": "The body as text, when it is valid UTF-8.",
+                    "type": "string"
+                  },
+                  "truncated": {
+                    "description": "True when less than the whole body is shown.",
+                    "type": "boolean"
+                  },
+                  "wire_bytes": {
+                    "description": "Bytes that crossed the wire.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "shown_bytes",
+                  "captured_bytes",
+                  "wire_bytes",
+                  "truncated",
+                  "capture_truncated",
+                  "decoded",
+                  "encoding"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "headers": {
+                "items": {
+                  "properties": {
+                    "name": {
+                      "description": "Header name.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Header value; credential headers read [redacted].",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "scheme": {
+            "description": "http or https.",
+            "type": "string"
+          },
+          "seq": {
+            "description": "Arrival order; pass the highest one as since to read newer flows.",
+            "type": "integer"
+          },
+          "start": {
+            "description": "When the exchange began, RFC 3339 UTC.",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status, 0 when there is none.",
+            "type": "integer"
+          },
+          "tls": {
+            "description": "TLS with the server, null for plain HTTP.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ttfb_ms": {
+            "description": "Time to the first response byte, in milliseconds.",
+            "type": "number"
+          },
+          "url": {
+            "description": "The full URL, or host:port for a tunnel.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "url",
+          "request"
+        ],
+        "type": "object"
+      },
+      "title": "Get one flow"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List hosts"
+      },
+      "description": "Read-only. Lists every host the proxy has seen with totals, most traffic first: flows, errors, bytes each way, first and last seen, whether anything was opened, the processes that reached it and FormNET's reading-aid label. Use it for an overview of where traffic goes before narrowing with list_flows. The label (category, owner) is a hint about the host, not a verdict.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 50,
+            "description": "Hosts to return, 1 to 500.",
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "q": {
+            "description": "Case-insensitive text in the host name or a process name.",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_hosts",
+      "outputSchema": {
+        "properties": {
+          "hosts": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "matched": {
+            "description": "Hosts that matched q.",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "True when more hosts matched than were returned.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hosts",
+          "matched",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "title": "List hosts"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Machine connections"
+      },
+      "description": "Read-only. Returns the latest table of every connection this computer holds and the process that owns it, from the running FormNET (the same table as `formnet snapshot`). Use it to see which programs talk to the network even when they ignore the proxy. Filter by process name, pid or state (ESTABLISHED, LISTEN, ...); limit bounds both lists (default 50) and truncated says when more matched.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 50,
+            "description": "Processes and connections to return, each 1 to 500.",
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "pid": {
+            "description": "Only this process id.",
+            "maximum": 2147483647,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "process": {
+            "description": "Case-insensitive part of the process name.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "state": {
+            "description": "Only connections in this state, such as ESTABLISHED or LISTEN.",
+            "maxLength": 32,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "machine_snapshot",
+      "outputSchema": {
+        "properties": {
+          "connections": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "error": {
+            "description": "Why the table is incomplete, when it is.",
+            "type": "string"
+          },
+          "matched_connections": {
+            "description": "Connections that matched.",
+            "type": "integer"
+          },
+          "matched_processes": {
+            "description": "Processes that matched.",
+            "type": "integer"
+          },
+          "processes": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "source": {
+            "description": "Which tool or file produced it.",
+            "type": "string"
+          },
+          "supported": {
+            "description": "False on a platform FormNET cannot read.",
+            "type": "boolean"
+          },
+          "taken": {
+            "description": "When the table was read, RFC 3339 UTC.",
+            "type": "string"
+          },
+          "total_connections": {
+            "description": "Connections in the whole table.",
+            "type": "integer"
+          },
+          "total_processes": {
+            "description": "Processes in the whole table.",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "True when more matched than were returned.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taken",
+          "supported",
+          "processes",
+          "connections",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "title": "Machine connections"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Proxy status"
+      },
+      "description": "Read-only. Returns the proxy's address, whether it is listening, the interception mode (auto, on or off) and whether HTTPS is opened now, the passthrough list, the root certificate path, and the environment variables that point a program at the proxy. Use it first in any task that routes a program through FormNET, and to read back a change made with set_interception or set_passthrough.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "proxy_status",
+      "outputSchema": {
+        "properties": {
+          "addr": {
+            "description": "The proxy's ip:port.",
+            "type": "string"
+          },
+          "ca_path": {
+            "description": "The root certificate (PEM) a program must trust.",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment variables that point a program at this proxy.",
+            "type": "object"
+          },
+          "error": {
+            "description": "Why the proxy is not running, when it is not.",
+            "type": "string"
+          },
+          "formnet_version": {
+            "description": "The running FormNET's version.",
+            "type": "string"
+          },
+          "hint": {
+            "description": "How to use the variables, and what they do not cover.",
+            "type": "string"
+          },
+          "intercept": {
+            "description": "True when HTTPS is opened now; false when it is tunnelled and only counted.",
+            "type": "boolean"
+          },
+          "intercept_mode": {
+            "description": "auto (open HTTPS while the root is trusted), on or off.",
+            "type": "string"
+          },
+          "listening": {
+            "description": "Same as running.",
+            "type": "boolean"
+          },
+          "passthrough": {
+            "items": {
+              "description": "A host or *.suffix pattern tunnelled without interception.",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "running": {
+            "description": "True while the proxy accepts connections.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "addr",
+          "running",
+          "intercept",
+          "intercept_mode",
+          "passthrough",
+          "env",
+          "hint"
+        ],
+        "type": "object"
+      },
+      "title": "Proxy status"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Root certificate"
+      },
+      "description": "Read-only. Returns FormNET's root certificate: path, common name, SHA-256 fingerprint, expiry, whether this computer trusts it, and the exact commands that trust and untrust it on this system. Use it when HTTPS is only counted, when a program refuses the certificate, or when the person asks how to trust or remove the root. Show the command for the person to run; never run it, never invent another, never ask for the private key.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "ca_info",
+      "outputSchema": {
+        "properties": {
+          "common_name": {
+            "description": "Its subject common name.",
+            "type": "string"
+          },
+          "fingerprint": {
+            "description": "SHA-256 of the certificate, hex with colons.",
+            "type": "string"
+          },
+          "not_after": {
+            "description": "Expiry, RFC 3339.",
+            "type": "string"
+          },
+          "note": {
+            "description": "Who runs the commands.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The root certificate, PEM.",
+            "type": "string"
+          },
+          "trust_command": {
+            "description": "Command the person runs to trust it.",
+            "type": "string"
+          },
+          "trust_hint": {
+            "description": "What that command does.",
+            "type": "string"
+          },
+          "trusted": {
+            "description": "True when the system trust store accepts it.",
+            "type": "boolean"
+          },
+          "untrust_command": {
+            "description": "Command the person runs to remove the trust.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "fingerprint",
+          "trusted",
+          "trust_command",
+          "untrust_command"
+        ],
+        "type": "object"
+      },
+      "title": "Root certificate"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Export HAR file"
+      },
+      "description": "Writes a file. Saves the matching flows as a HAR 1.2 file under FormNET's data folder, in <data>/exports only, and returns its path; it never writes anywhere else and never replaces an existing file. Use it when the person wants a recording to open in a browser's developer tools or another HAR viewer. file_name is a plain name (letters, digits, dot, dash, underscore; .har is added), never a path. Credential headers are redacted by default. include_secrets=true writes them as captured: that is an approval choice, so ask the person before setting it. Tunnels and refused flows have no HTTP shape and are left out.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Only flows from a client address starting with this ip:port prefix, as list_flows shows it in client.",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "domain": {
+            "description": "Only flows whose host belongs to this registrable domain, such as example.com (it covers its subdomains).",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "file_name": {
+            "description": "Plain file name for the export, such as checkout-bug.har. No folders, separators or ..",
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$",
+            "type": "string"
+          },
+          "host": {
+            "description": "Only flows to this host: an exact name such as api.example.com, or a *.suffix pattern such as *.example.com.",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "include_secrets": {
+            "default": false,
+            "description": "Needs the person's approval. true writes Authorization, Proxy-Authorization, Cookie and Set-Cookie values as captured; false (the default) writes [redacted].",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "Only flows of this kind: http (opened, with headers and bodies), websocket, tunnel (HTTPS passed through and only counted) or refused (the program refused FormNET's certificate, usually because it pins certificates).",
+            "enum": [
+              "http",
+              "websocket",
+              "tunnel",
+              "refused"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Only the newest this many matching flows; leave out for every match.",
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "pending": {
+            "description": "true for exchanges still in progress, false for finished ones; leave out for both.",
+            "type": "boolean"
+          },
+          "q": {
+            "description": "Case-insensitive text found in the URL, method, status code, process name or response content type.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "since": {
+            "description": "Only flows with a seq greater than this. Pass the highest seq of the last answer to read only what arrived after it.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_name"
+        ],
+        "type": "object"
+      },
+      "name": "export_har",
+      "outputSchema": {
+        "properties": {
+          "bytes": {
+            "description": "Size of the file.",
+            "type": "integer"
+          },
+          "file_name": {
+            "description": "The file name used.",
+            "type": "string"
+          },
+          "note": {
+            "description": "What the file holds and how to keep it.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Where the file was written, inside <data>/exports.",
+            "type": "string"
+          },
+          "secrets_included": {
+            "description": "True when credential headers are in the file.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "file_name",
+          "bytes",
+          "secrets_included",
+          "note"
+        ],
+        "type": "object"
+      },
+      "title": "Export HAR file"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Clear the recording"
+      },
+      "description": "Needs approval: destructive. Forgets every flow FormNET holds, for every program, in the web client too; it cannot be undone. Use it only when the person asks to start a clean recording. Export first with export_har if anything may be needed later.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "clear_flows",
+      "outputSchema": {
+        "properties": {
+          "cleared": {
+            "description": "True once the recording is empty.",
+            "type": "boolean"
+          },
+          "removed": {
+            "description": "Flows held just before clearing.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cleared",
+          "removed"
+        ],
+        "type": "object"
+      },
+      "title": "Clear the recording"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Set HTTPS interception"
+      },
+      "description": "Needs approval: changes the proxy for every program using it, and is kept for FormNET's next start. Sets whether HTTPS is opened: auto opens it while this computer trusts the root, on opens it always, off tunnels it and only counts hosts and bytes. Use it when the person wants HTTPS contents recorded or wants interception stopped. With on and an untrusted root, programs that check certificates refuse the proxy. Returns the proxy status read back.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "description": "auto, on or off.",
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
+      "name": "set_interception",
+      "outputSchema": {
+        "properties": {
+          "addr": {
+            "description": "The proxy's ip:port.",
+            "type": "string"
+          },
+          "ca_path": {
+            "description": "The root certificate (PEM) a program must trust.",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment variables that point a program at this proxy.",
+            "type": "object"
+          },
+          "error": {
+            "description": "Why the proxy is not running, when it is not.",
+            "type": "string"
+          },
+          "formnet_version": {
+            "description": "The running FormNET's version.",
+            "type": "string"
+          },
+          "hint": {
+            "description": "How to use the variables, and what they do not cover.",
+            "type": "string"
+          },
+          "intercept": {
+            "description": "True when HTTPS is opened now; false when it is tunnelled and only counted.",
+            "type": "boolean"
+          },
+          "intercept_mode": {
+            "description": "auto (open HTTPS while the root is trusted), on or off.",
+            "type": "string"
+          },
+          "listening": {
+            "description": "Same as running.",
+            "type": "boolean"
+          },
+          "passthrough": {
+            "items": {
+              "description": "A host or *.suffix pattern tunnelled without interception.",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "running": {
+            "description": "True while the proxy accepts connections.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "addr",
+          "running",
+          "intercept",
+          "intercept_mode",
+          "passthrough",
+          "env",
+          "hint"
+        ],
+        "type": "object"
+      },
+      "title": "Set HTTPS interception"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Set passthrough hosts"
+      },
+      "description": "Needs approval: changes the proxy for every program using it, and is kept for FormNET's next start. Replaces the whole list of hosts whose HTTPS is tunnelled without interception. Use it for programs that pin certificates (their flows show kind refused): add their hosts so they work through the proxy again, counted but not opened. Read the current list with proxy_status first and send it back with the change. Returns the proxy status read back.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "patterns": {
+            "description": "The complete new list: host names such as api.example.com or *.suffix patterns such as *.apple.com. An empty list turns passthrough off.",
+            "items": {
+              "maxLength": 253,
+              "pattern": "^(\\*\\.)?[A-Za-z0-9._\\[\\]:-]+$",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          }
+        },
+        "required": [
+          "patterns"
+        ],
+        "type": "object"
+      },
+      "name": "set_passthrough",
+      "outputSchema": {
+        "properties": {
+          "addr": {
+            "description": "The proxy's ip:port.",
+            "type": "string"
+          },
+          "ca_path": {
+            "description": "The root certificate (PEM) a program must trust.",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment variables that point a program at this proxy.",
+            "type": "object"
+          },
+          "error": {
+            "description": "Why the proxy is not running, when it is not.",
+            "type": "string"
+          },
+          "formnet_version": {
+            "description": "The running FormNET's version.",
+            "type": "string"
+          },
+          "hint": {
+            "description": "How to use the variables, and what they do not cover.",
+            "type": "string"
+          },
+          "intercept": {
+            "description": "True when HTTPS is opened now; false when it is tunnelled and only counted.",
+            "type": "boolean"
+          },
+          "intercept_mode": {
+            "description": "auto (open HTTPS while the root is trusted), on or off.",
+            "type": "string"
+          },
+          "listening": {
+            "description": "Same as running.",
+            "type": "boolean"
+          },
+          "passthrough": {
+            "items": {
+              "description": "A host or *.suffix pattern tunnelled without interception.",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "running": {
+            "description": "True while the proxy accepts connections.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "addr",
+          "running",
+          "intercept",
+          "intercept_mode",
+          "passthrough",
+          "env",
+          "hint"
+        ],
+        "type": "object"
+      },
+      "title": "Set passthrough hosts"
+    }
+  ]
+}
