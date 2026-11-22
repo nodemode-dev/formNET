@@ -134,7 +134,7 @@ func (s *handler) guard(next http.Handler) http.Handler {
 	port := portOf(s.Addr)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !hostAllowed(r.Host, port) {
-			writeError(w, http.StatusForbidden, "formnet answers only on its loopback address")
+			writeError(w, http.StatusForbidden, "FormNET answers only on its loopback address")
 			return
 		}
 		if crossSite(r) && !(r.URL.Path == "/" && r.Method == http.MethodGet) {
@@ -142,14 +142,14 @@ func (s *handler) guard(next http.Handler) http.Handler {
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r, port) {
-			writeError(w, http.StatusForbidden, "writes are accepted from the formnet page only")
+			writeError(w, http.StatusForbidden, "writes are accepted from the FormNET page only")
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		if needsSession(r.URL.Path) && !s.hasSession(r) {
-			writeError(w, http.StatusUnauthorized, "no session: open formnet from the address printed by formnet serve, or run formnet open")
+			writeError(w, http.StatusUnauthorized, "no session: open FormNET from the address printed by formnet serve, or run formnet open")
 			return
 		}
 		if r.URL.Query().Has("token") {
@@ -634,10 +634,10 @@ func (s *handler) client() http.Handler {
 	})
 }
 
-const noSessionPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>formnet</title>
+const noSessionPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FormNET</title>
 <meta name="color-scheme" content="dark light"><style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5}code{font-family:ui-monospace,monospace}</style></head>
-<body><h1>formnet</h1><p>That token is not this run's. formnet answers only to the page it opened itself, so that no other program on this computer can read the recordings.</p>
-<p>Open formnet from the address printed by <code>formnet serve</code> (it carries this run's token), or run <code>formnet open</code>.</p></body></html>`
+<body><h1>FormNET</h1><p>That token is not this run's. FormNET answers only to the page it opened itself, so that no other program on this computer can read the recordings.</p>
+<p>Open FormNET from the address printed by <code>formnet serve</code> (it carries this run's token), or run <code>formnet open</code>.</p></body></html>`
 
 func (s *handler) noSession(w http.ResponseWriter, status int) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

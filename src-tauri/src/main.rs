@@ -424,7 +424,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("the formNET desktop app failed to build");
+        .expect("the FormNET desktop app failed to build");
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
