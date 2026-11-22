@@ -24,14 +24,20 @@ func trustInstructionsFor(goos, path, commonName string) (command, hint, untrust
 			"Installs the root system-wide (needs sudo) on Debian and Ubuntu; on Fedora copy it to /etc/pki/ca-trust/source/anchors/ and run update-ca-trust. For your user only, and for Chrome and Firefox which keep their own store: certutil -d sql:$HOME/.pki/nssdb -A -t C,, -n formnet -i " + q + " (remove with certutil -d sql:$HOME/.pki/nssdb -D -n formnet).",
 			"sudo rm /usr/local/share/ca-certificates/formnet.crt && sudo update-ca-certificates --fresh"
 	case "windows":
-		return "certutil -addstore -user Root " + q,
+		return "certutil -addstore -user Root " + windowsQuote(path),
 			"Adds the root to your user's Trusted Root store (no administrator needed); Windows shows a confirmation dialog. Edge, Chrome and most apps then accept connections formnet opens. Firefox needs security.enterprise_roots.enabled set to true.",
-			"certutil -delstore -user Root " + shellQuote(commonName)
+			"certutil -delstore -user Root " + windowsQuote(commonName)
 	default:
 		return "",
 			"Import " + path + " as a trusted root certificate authority in this system's certificate store.",
 			""
 	}
+}
+
+// windowsQuote wraps s in double quotes for cmd.exe and PowerShell; Windows
+// paths and host names cannot hold a double quote.
+func windowsQuote(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, "") + `"`
 }
 
 // shellQuote wraps s in single quotes, escaping the quotes inside it.
