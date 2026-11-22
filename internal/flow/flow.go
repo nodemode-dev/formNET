@@ -18,6 +18,7 @@ const (
 	KindHTTP      = "http"      // a request and response, headers and bodies
 	KindTunnel    = "tunnel"    // a CONNECT the proxy passed through: only the host and byte counts
 	KindWebSocket = "websocket" // an upgrade the proxy forwarded: headers, then byte counts
+	KindRefused   = "refused"   // a CONNECT the proxy opened whose client refused the certificate
 )
 
 // Header is one header line. Names are sorted (net/http keeps no wire order); the values of one name keep their order.
@@ -35,6 +36,7 @@ type Message struct {
 	BodyTruncated bool     `json:"body_truncated"` // true when Body holds less than BodyBytes
 	ContentType   string   `json:"content_type"`
 	Encoding      string   `json:"encoding"` // the Content-Encoding as sent
+	Decoded       bool     `json:"-"`        // Body holds the decoded form of a Content-Encoding
 }
 
 // TLSInfo describes the TLS the proxy negotiated with the upstream server.

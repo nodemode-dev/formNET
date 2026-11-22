@@ -7,7 +7,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/nodemode-dev/formnet/internal/flow"
@@ -71,13 +74,88 @@ func (p *Proxy) refuseConnect(w http.ResponseWriter, o origin, err error) {
 // the HTTP it carries as https requests.
 func (p *Proxy) serveTLS(pc *peekedConn, o origin) {
 	tlsConn := tls.Server(pc, p.opts.CA.TLSConfigFor(o.host))
-	_ = tlsConn.SetDeadline(time.Now().Add(handshakeTimeout))
+	began := time.Now()
+	_ = tlsConn.SetDeadline(began.Add(handshakeTimeout))
 	if err := tlsConn.Handshake(); err != nil {
 		p.log.Debug("client refused the opened connection", "host", o.host, "err", err)
+		p.recordRefusal(o, began, tlsConn.ConnectionState().ServerName, err)
 		return
 	}
 	_ = tlsConn.SetDeadline(time.Time{})
 	p.serveInside(tlsConn, o)
+}
+
+// refusalWindow collapses a burst of refused handshakes from one program to one host into one flow.
+const refusalWindow = 2 * time.Second
+
+// recordRefusal stores a flow for a client that would not finish the TLS
+// handshake with formnet's leaf, at most one per program and host per window.
+func (p *Proxy) recordRefusal(o origin, began time.Time, serverName string, err error) {
+	f := p.newFlow(flow.KindRefused, o, http.MethodConnect, "https://"+o.hostPort())
+	f.Start = began
+	now := time.Now()
+	if !p.firstRefusal(refusalKey(f), now) {
+		return
+	}
+	f.TLS = &flow.TLSInfo{ServerName: serverName, Intercepted: true}
+	f.Error = "the client refused FormNET's certificate: " + refusalReason(err)
+	p.opts.Store.Add(f.Completed(now))
+}
+
+func refusalKey(f flow.Flow) string {
+	who := f.ClientProcess
+	if f.ClientPID > 0 {
+		who = strconv.Itoa(f.ClientPID) + " " + who
+	}
+	if who == "" {
+		who, _, _ = net.SplitHostPort(f.Client)
+	}
+	return who + "\x00" + strings.ToLower(f.Host)
+}
+
+// firstRefusal reports whether key has no refusal recorded within the window, and marks it.
+func (p *Proxy) firstRefusal(key string, now time.Time) bool {
+	p.refusedMu.Lock()
+	defer p.refusedMu.Unlock()
+	if p.refused == nil {
+		p.refused = map[string]time.Time{}
+	}
+	if last, ok := p.refused[key]; ok && now.Sub(last) < refusalWindow {
+		return false
+	}
+	if len(p.refused) >= 256 {
+		for k, t := range p.refused {
+			if now.Sub(t) >= refusalWindow {
+				delete(p.refused, k)
+			}
+		}
+	}
+	p.refused[key] = now
+	return true
+}
+
+// refusalReason names why the handshake ended, in a few words.
+func refusalReason(err error) string {
+	var op *net.OpError
+	if errors.As(err, &op) && op.Op == "remote error" && op.Err != nil {
+		return strings.TrimPrefix(op.Err.Error(), "tls: ")
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return "the handshake timed out"
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) {
+		return "it closed the connection during the handshake"
+	}
+	if strings.Contains(err.Error(), "bad record MAC") {
+		// A TLS 1.3 client that rejects the certificate sends its alert under keys this side cannot read yet.
+		return "it ended the handshake after it received the certificate"
+	}
+	reason := strings.TrimPrefix(err.Error(), "tls: ")
+	if len(reason) > 120 {
+		reason = reason[:120]
+	}
+	return reason
 }
 
 // serveInside serves HTTP/1.1 on one connection, each request forwarded as from origin.
