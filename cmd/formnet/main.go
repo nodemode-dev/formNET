@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,6 +30,7 @@ import (
 	"github.com/nodemode-dev/formnet/internal/machine"
 	"github.com/nodemode-dev/formnet/internal/proxy"
 	"github.com/nodemode-dev/formnet/internal/server"
+	"github.com/nodemode-dev/formnet/internal/userfile"
 )
 
 func main() {
@@ -73,6 +73,7 @@ func usage(w io.Writer) {
   url              print the address of the running formnet, with this run's session token
   open             open that address in the browser
   ca               print the root certificate's path, fingerprint and trust state
+  ca --json        the same as one JSON object (path, fingerprint, trusted, not_after, ...)
   ca export PATH   write the root certificate (PEM) to PATH
   ca trust         print the command that makes this computer trust the root
   snapshot         print the machine's connection table once, as JSON
@@ -132,8 +133,17 @@ func serve(stdout, stderr io.Writer) int {
 		}()
 	}
 
+	prev := readPrevious(cfg.Data)
+	bound, err := claim(cfg, prev, stderr)
+	if err != nil {
+		log.Error("listen", "err", err)
+		return 1
+	}
+	apiAddr, proxyAddr := bound.api.Addr().String(), bound.proxy.Addr().String()
 	token, err := sessionToken(cfg)
 	if err != nil {
+		_ = bound.api.Close()
+		_ = bound.proxy.Close()
 		log.Error("session token", "err", err)
 		return 1
 	}
@@ -151,30 +161,29 @@ func serve(stdout, stderr io.Writer) int {
 		Passthrough: cfg.Passthrough,
 		Intercept:   intercept,
 		Owner:       monitor.Owner,
-		Refuse:      []string{cfg.Addr, cfg.ProxyAddr},
+		Refuse:      []string{apiAddr, proxyAddr},
 		Log:         log,
 	})
 	proxyErr := make(chan error, 1)
-	go func() { proxyErr <- px.ListenAndServe(ctx, cfg.ProxyAddr) }()
+	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
-	ln, err := net.Listen("tcp", cfg.Addr)
-	if err != nil {
-		log.Error("listen", "addr", cfg.Addr, "err", err)
-		return 1
-	}
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: cfg.Addr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
 	apiErr := make(chan error, 1)
-	go func() { apiErr <- api.Serve(ln) }()
+	go func() { apiErr <- api.Serve(bound.api) }()
 
 	if err := waitForProxy(px, proxyErr); err != nil {
-		log.Error("proxy", "addr", cfg.ProxyAddr, "err", err)
+		log.Error("proxy", "addr", proxyAddr, "err", err)
 		return 1
 	}
-	log.Info("formnet", "version", app.Version, "open", sessionURL(cfg.Addr, token), "proxy", cfg.ProxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted, "intercept", intercept)
+	if err := writeEndpoints(cfg.Data, endpoints{Product: app.Product, Version: app.Version, PID: os.Getpid(), Addr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Started: time.Now().UTC()}); err != nil {
+		log.Warn("endpoints file", "err", err)
+	}
+	defer removeEndpoints(cfg.Data)
+	log.Info("formnet", "version", app.Version, "open", sessionURL(apiAddr, token), "proxy", proxyAddr, "data", cfg.Data, "ca_trusted", info.Trusted, "intercept", intercept)
 	switch {
 	case !info.Trusted && !intercept:
 		log.Info("the root certificate is not trusted yet, so HTTPS is counted but not opened", "run", "formnet ca trust")
@@ -182,7 +191,7 @@ func serve(stdout, stderr io.Writer) int {
 		log.Info("HTTPS is opened although the root is not trusted; programs that verify certificates will refuse the proxy", "run", "formnet ca trust")
 	}
 	// The desktop app waits for this line before it opens its window.
-	fmt.Fprintf(stdout, "formnet desktop ready http://%s/\n", cfg.Addr)
+	fmt.Fprintf(stdout, "formnet desktop ready http://%s/\n", apiAddr)
 
 	code := 0
 	select {
@@ -198,6 +207,7 @@ func serve(stdout, stderr io.Writer) int {
 			code = 1
 		}
 	}
+	removeEndpoints(cfg.Data)
 	stop()
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -239,11 +249,8 @@ func sessionToken(cfg config.Config) (string, error) {
 		token = hex.EncodeToString(b[:])
 	}
 	path := filepath.Join(cfg.Data, tokenFile)
-	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+	if err := userfile.Write(path, []byte(token+"\n")); err != nil {
 		return "", fmt.Errorf("write %s: %w", path, err)
-	}
-	if err := os.Chmod(path, 0o600); err != nil {
-		return "", fmt.Errorf("chmod %s: %w", path, err)
 	}
 	return token, nil
 }
@@ -264,7 +271,11 @@ func currentURL(stderr io.Writer) (string, bool) {
 		fmt.Fprintln(stderr, "formnet: no session token found; is formnet serve running with this data folder?")
 		return "", false
 	}
-	return sessionURL(cfg.Addr, strings.TrimSpace(string(raw))), true
+	addr := cfg.Addr
+	if e, ok := readEndpoints(cfg.Data); ok && e.Addr != "" {
+		addr = e.Addr
+	}
+	return sessionURL(addr, strings.TrimSpace(string(raw))), true
 }
 
 func printURL(stdout, stderr io.Writer) int {
@@ -324,6 +335,14 @@ func caCommand(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "path:        %s\nfingerprint: %s\nexpires:     %s\ntrusted:     %t\n", info.Path, info.Fingerprint, info.NotAfter.Format(time.RFC3339), info.Trusted)
 		if !info.Trusted {
 			fmt.Fprintf(stdout, "\n%s\n  %s\n", info.TrustHint, info.TrustCommand)
+		}
+		return 0
+	case "--json", "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(info); err != nil {
+			log.Error("json", "err", err)
+			return 1
 		}
 		return 0
 	case "export":

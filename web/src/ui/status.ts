@@ -110,6 +110,9 @@ export class StatusBar {
   private syncHint(s: State): void {
     setClass(this.hint, 'is-error', !!this.errText);
     if (this.errText) { setText(this.hint, this.errText); setTitle(this.hint, this.errText); return; }
+    const notice = (s.status?.notices ?? []).join(' ');
+    setClass(this.hint, 'is-error', !!notice);
+    if (notice) { setText(this.hint, notice); setTitle(this.hint, notice); return; }
     const text = HINTS[s.view].split(' · ').map((x) => t(x)).join(' · ');
     setText(this.hint, text);
     setTitle(this.hint, text);
