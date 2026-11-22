@@ -15,6 +15,7 @@
 //	FORMNET_SYSTEM_PROXY 1 or 0: point the system proxy at formnet for this run (macOS, Windows); when set, wins over <data>/settings.json
 //	FORMNET_REMOTE_CAPTURE 1 or 0: also listen for the proxy (never the API) on this computer's network addresses; when set, wins over <data>/settings.json
 //	FORMNET_REMOTE_ALLOW   comma-separated addresses or CIDR ranges allowed to use that listener; when set, wins over <data>/settings.json
+//	FORMNET_UPSTREAM_PROXY http://host:port, https://host:port or socks5://host:port (user:password@ allowed) that FormNET's own outgoing connections go through, or off; when set, wins over <data>/settings.json for this run and is never written
 //	FORMNET_DESKTOP      set by the desktop app; the server stops when its stdin closes
 package config
 
@@ -60,6 +61,9 @@ type Config struct {
 	RemoteSet      bool     // FORMNET_REMOTE_CAPTURE was set: it wins over <data>/settings.json for this run
 	RemoteAllow    []string // FORMNET_REMOTE_ALLOW's entries, each an address or a CIDR range
 	RemoteAllowSet bool     // FORMNET_REMOTE_ALLOW was set: it wins over <data>/settings.json for this run
+
+	UpstreamProxy string // FORMNET_UPSTREAM_PROXY's URL; empty with UpstreamSet means off for this run
+	UpstreamSet   bool   // FORMNET_UPSTREAM_PROXY was set: it wins over <data>/settings.json for this run
 }
 
 // Load resolves the configuration from the environment and the home folder.
@@ -136,7 +140,15 @@ func load(getenv func(string) string, home func() (string, error)) (Config, erro
 			}
 		}
 	}
+	upstream := strings.TrimSpace(getenv("FORMNET_UPSTREAM_PROXY"))
+	upstreamSet := upstream != ""
+	switch strings.ToLower(upstream) {
+	case "0", "off", "none", "false", "no":
+		upstream = ""
+	}
 	return Config{
+		UpstreamProxy:   upstream,
+		UpstreamSet:     upstreamSet,
 		RemoteCapture:   remote,
 		RemoteSet:       remoteSet,
 		RemoteAllow:     remoteAllow,

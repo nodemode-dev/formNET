@@ -29,7 +29,7 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "formnet cannot take over this connection", http.StatusInternalServerError)
 		return
 	}
-	if _, err := p.guard.resolve(r.Context(), o.hostPort()); err != nil {
+	if err := p.checkDestination(r.Context(), o.hostPort()); err != nil {
 		p.refuseConnect(w, o, err)
 		return
 	}
@@ -73,7 +73,7 @@ func (p *Proxy) refuseConnect(w http.ResponseWriter, o origin, err error) {
 // serveTLS opens the client's TLS with a leaf for the CONNECT host and serves
 // the HTTP it carries as https requests.
 func (p *Proxy) serveTLS(pc *peekedConn, o origin) {
-	tlsConn := tls.Server(pc, p.opts.CA.TLSConfigFor(o.host))
+	tlsConn := tls.Server(pc, offerH2(p.opts.CA.TLSConfigFor(o.host)))
 	began := time.Now()
 	_ = tlsConn.SetDeadline(began.Add(handshakeTimeout))
 	if err := tlsConn.Handshake(); err != nil {
@@ -82,6 +82,10 @@ func (p *Proxy) serveTLS(pc *peekedConn, o origin) {
 		return
 	}
 	_ = tlsConn.SetDeadline(time.Time{})
+	if tlsConn.ConnectionState().NegotiatedProtocol == "h2" {
+		p.serveH2(tlsConn, o)
+		return
+	}
 	p.serveInside(tlsConn, o)
 }
 

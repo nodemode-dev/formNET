@@ -91,6 +91,14 @@ type Flow struct {
 	Paused    string   `json:"paused,omitempty"`    // request or response while it waits at a breakpoint
 	Throttled bool     `json:"throttled,omitempty"` // the throttle slowed this exchange or tunnel
 	Notes     []string `json:"notes,omitempty"`     // what FormNET did to it: blocked, mapped, edited, released
+
+	ClientProto string          `json:"client_proto,omitempty"` // the protocol between the program and FormNET: HTTP/1.1, HTTP/2.0
+	ServerProto string          `json:"server_proto,omitempty"` // the protocol between FormNET and the server, when a server answered
+	Upstream    string          `json:"upstream,omitempty"`     // the upstream proxy this exchange went through (no credentials)
+	Messages    *MessageSummary `json:"messages,omitempty"`     // WebSocket messages seen on this flow (messages.go)
+
+	FromSession bool   `json:"from_session,omitempty"` // opened from a session file or imported, not captured in this run (session.go)
+	Imported    string `json:"imported,omitempty"`     // the format it was imported from: har
 }
 
 // Summary is the Flow without bodies, as the list and the stream carry it.

@@ -19,7 +19,7 @@
 //	GET  /api/ca                   CA info and the trust command
 //	GET  /ca.pem                   the root certificate, for installing trust
 //	GET  /api/export/har           HAR 1.2 of the matching flows (same filters as /api/flows); credential headers redacted unless secrets=1
-//	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, machine.snapshot, breakpoint.paused, breakpoint.resumed, ping
+//	GET  /api/stream               server-sent events: flow.added, flow.updated, flow.cleared, flow.message (at most 10 a second per flow), machine.snapshot, breakpoint.paused, breakpoint.resumed, ping
 //	GET  /api/rules                the rule list {version, enabled, rules, intercept, https_note, notes}; rules change HTTPS only where it is opened
 //	PUT  /api/rules                {"rules": [...]}: replace the whole list, validated (400 names the field), kept in <data>/rules.json
 //	POST /api/rules/enabled        {"enabled": bool}: the switch that turns every rule off or on
@@ -31,8 +31,29 @@
 //	POST /api/throttle             any of those fields but presets, kept in <data>/settings.json
 //	GET  /api/remote               capture from other devices: {enabled, allow, from_env, port, addresses, listening, refused, last_refused, cert_url, error}
 //	POST /api/remote               {"enabled": bool, "allow": [CIDR or address]} (either field; on needs one allow entry), kept in <data>/settings.json; the proxy only, never this API
+//	GET  /api/flows/{id}/messages  a WebSocket flow's messages: since=<seq>, limit; {flow_id, messages, next, count, bytes, dropped, open, evicted, ...}
+//	GET  /api/upstream             the upstream proxy: {enabled, url, bypass, username, has_password, from_env, active, error}; never the password
+//	POST /api/upstream             {"enabled", "url", "bypass", "username", "password"} (each optional; password is write only, "" removes it), kept in <data>/settings.json
 //	     /api/terminal...          the terminal dock and the agent finder, when Deps.Terminals is set (internal/terminal)
+//	POST /api/session/save         {"name"}: save every flow with its bodies and WebSocket messages as <data>/sessions/<name>.formnet (never replaces a file); {name, path, flows, bytes, saved}
+//	GET  /api/session/export       the same file as a download (gzip); takes the /api/flows filters
+//	GET  /api/sessions             saved sessions: {folder, sessions: [{name, path, saved, flows, bytes, app_version, error}]}
+//	POST /api/session/open         {"name"} of a saved session, or a .formnet file (multipart "file" part, or the body itself): replaces the flows with the file's, marked from_session; {session, flows, dropped, messages}
+//	POST /api/import/har           a HAR 1.2 file (multipart "file" part, or the body itself): adds its entries as flows marked from_session and imported "har"; {imported, skipped, dropped, messages, creator}
+//	GET  /api/export/curl          a script with one curl command per matching http flow: the /api/flows filters, shell=sh|powershell|cmd, secrets=1
 //	GET  /                         the web client
+//
+// The list, the HAR, session and cURL exports also take: status (404, 4xx or
+// 200-299), method (GET,POST), type (response content type prefix), min_size
+// and max_size (response body bytes), min_ms and max_ms (duration), error,
+// rules, throttled and from_session (1 or 0), process (client process,
+// substring), focus (host globs, comma separated), ignore (host globs whose
+// flows are left out, applied after focus) and body (a substring of the
+// captured text bodies, at most flow.DefaultBodyScan bytes read per
+// request; the list answers body_scanned_bytes and body_scan_cut). A
+// leading ! inverts status, method, type, process, domain, host or body
+// (status=!2xx, method=!GET,HEAD for neither, body=!secret); a bare ! is a
+// 400 naming the field. Every filter must match.
 //
 // Every request must carry a Host header for the loopback address (DNS
 // rebinding guard). Cross-site requests from a browser are refused on every
@@ -114,6 +135,10 @@ type Deps struct {
 	Terminals interface{ Register(mux *http.ServeMux) }
 	// Traffic adds rules, breakpoints, the throttle and remote capture (rules_routes.go); nil adds none.
 	Traffic TrafficControl
+	// Protocol adds WebSocket messages and the upstream proxy (protocol_routes.go); nil adds none.
+	Protocol ProtocolControl
+	// Data is the data folder; sessions are kept in <Data>/sessions (data_routes.go). Empty refuses saving and opening.
+	Data string
 }
 
 // SystemProxyControl is what the API needs from the system proxy manager.
@@ -162,6 +187,8 @@ func Handler(d Deps) http.Handler {
 		d.Terminals.Register(mux)
 	}
 	s.registerRules(mux)
+	s.registerProtocol(mux)
+	s.registerData(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "no such route") })
 	mux.Handle("/", s.client())
 	return s.guard(mux)
@@ -169,6 +196,7 @@ func Handler(d Deps) http.Handler {
 
 type handler struct {
 	Deps
+	data *dataState // the opened session (data_routes.go)
 }
 
 // guard refuses requests whose Host is not this server, cross-site requests
@@ -319,6 +347,10 @@ type statusBody struct {
 	SysProxy sysproxy.Status `json:"sysproxy"`
 
 	*TrafficStatus // rules, throttle, remote; absent when Deps.Traffic is nil
+
+	Upstream *proxy.UpstreamStatus `json:"upstream,omitempty"` // absent when Deps.Protocol is nil
+
+	Session SessionStatus `json:"session"` // an opened session file (data_routes.go)
 }
 
 type machineStatus struct {
@@ -351,6 +383,10 @@ func (s *handler) status(w http.ResponseWriter, r *http.Request) {
 		SysProxy: s.systemProxy(),
 
 		TrafficStatus: s.trafficStatus(),
+
+		Upstream: s.upstreamStatus(),
+
+		Session: s.sessionStatus(),
 	})
 }
 
@@ -493,8 +529,12 @@ func (s *handler) listFlows(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	flows := s.Store.List(q)
-	writeJSON(w, http.StatusOK, map[string]any{"flows": flows, "total": s.Store.Len()})
+	flows, scan, err := s.search(r, q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"flows": flows, "total": s.Store.Len(), "body_scanned_bytes": scan.BodyScanned, "body_scan_cut": scan.BodyCut})
 }
 
 // body is how a captured body travels to the client.
@@ -547,6 +587,7 @@ func (s *handler) getFlow(w http.ResponseWriter, r *http.Request) {
 
 func (s *handler) clearFlows(w http.ResponseWriter, r *http.Request) {
 	s.Store.Clear()
+	s.sessionClosed()
 	writeJSON(w, http.StatusOK, map[string]any{"cleared": true})
 }
 
@@ -672,7 +713,11 @@ func (s *handler) exportHAR(w http.ResponseWriter, r *http.Request) {
 	}
 	// The list strips bodies; the export wants them, so each flow is re-read
 	// and written on its own, and the document never sits in memory whole.
-	listed := s.Store.List(q)
+	listed, _, err := s.search(r, q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	name := "formnet-" + time.Now().UTC().Format("20060102-150405") + ".har"
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
@@ -704,6 +749,7 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 	flows, dropped := s.Store.SubscribeCounted(ctx)
 	snaps := s.Machine.Subscribe(ctx)
 	pauses := s.breakpointEvents(ctx)
+	messages := s.messageEvents(ctx)
 	send := func(event string, v any) bool {
 		raw, err := json.Marshal(v)
 		if err != nil {
@@ -745,6 +791,10 @@ func (s *handler) stream(w http.ResponseWriter, r *http.Request) {
 			}
 		case e := <-pauses:
 			if !send(e.Type, e) {
+				return
+			}
+		case e := <-messages:
+			if !send("flow.message", e) {
 				return
 			}
 		case <-ticker.C:

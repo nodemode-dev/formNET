@@ -115,6 +115,7 @@ func (p *Proxy) outgoing(r *http.Request, rawURL string, body io.ReadCloser) (*h
 		return nil, err
 	}
 	out.Header = forwardable(r.Header, false)
+	keepTE(out.Header, r.Header, r.Trailer, out)
 	out.ContentLength = r.ContentLength
 	if r.ContentLength == 0 && r.Body == http.NoBody {
 		out.Body = http.NoBody
@@ -137,6 +138,7 @@ func (p *Proxy) relayResponse(w http.ResponseWriter, resp *http.Response, f flow
 	}
 	w.WriteHeader(resp.StatusCode)
 	copyErr := copyFlush(w, resCapture)
+	afterBody(w, resp, &f)
 	end := time.Now()
 	statusLine := fmt.Sprintf("%s %s", resp.Proto, resp.Status)
 	res := resCapture.message(resp.Header, statusLine, p.opts.BodyLimit)
