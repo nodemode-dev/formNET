@@ -2,6 +2,17 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.8.0 · 2026-11-22
+
+Change what passes through FormNET, and capture a phone.
+
+- Rules, in Preferences and the new Tools menu: rewrite headers, the address, the status or the body; map a request to another server (Map Remote) or answer it from a file or folder on this computer (Map Local); block a host with a 403 or by dropping the connection. Each rule has its own switch, and Enable Rules (Cmd+Option+K, Ctrl+Alt+K) turns them all off and on. Flows marks every request a rule changed. Make a Rule turns a flow into a rule.
+- Breakpoints: pause a request or its response, change it, then let it go on or abort it. A forgotten breakpoint lets the request go on by itself after a minute, so no program hangs.
+- Throttling: 3G, 4G, slow Wi-Fi or your own speeds and delay, for everything or a list of hosts.
+- Capture from other devices: a phone or another computer on your network can use FormNET's proxy, for the addresses you allow. It is off until you turn it on, and FormNET's own window and data stay reachable from this computer only. The phone installs FormNET's certificate from http://formnet.cert/.
+- Fixed: Esc closes Preferences after you use the System Proxy switch.
+- The new labels read in English in the other languages until a later version translates them.
+
 ## 0.7.0 · 2026-11-22
 
 No setup by hand, and any request can be sent again.
