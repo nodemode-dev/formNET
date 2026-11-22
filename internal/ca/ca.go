@@ -339,11 +339,19 @@ func (c *CA) Trusted() bool {
 	return c.trusted
 }
 
+// TrustedNow asks the system trust store again, ignoring the cached answer.
+func (c *CA) TrustedNow() bool {
+	c.trustMu.Lock()
+	defer c.trustMu.Unlock()
+	c.trusted = c.checkTrust()
+	c.trustChecked = time.Now()
+	return c.trusted
+}
+
 func (c *CA) checkTrust() bool {
 	leaf, err := c.Leaf(trustCheckHost)
 	if err != nil || leaf.Leaf == nil {
 		return false
 	}
-	_, err = leaf.Leaf.Verify(x509.VerifyOptions{DNSName: trustCheckHost, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}})
-	return err == nil
+	return c.storeAccepts(leaf.Leaf)
 }
