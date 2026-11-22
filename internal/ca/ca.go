@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nodemode-dev/formnet/internal/userfile"
 )
 
 const (
@@ -169,7 +171,13 @@ func createRoot(certPath, keyPath string) (*x509.Certificate, []byte, *ecdsa.Pri
 // writeNew creates path with mode and content, refusing to replace a file
 // that already exists (or that something put there between the check and now).
 func writeNew(path string, content []byte, mode os.FileMode) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	var f *os.File
+	var err error
+	if mode&0o077 == 0 {
+		f, err = userfile.Create(path)
+	} else {
+		f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	}
 	if err != nil {
 		return err
 	}
