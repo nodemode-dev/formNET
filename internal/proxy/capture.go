@@ -11,6 +11,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
+
 	"github.com/nodemode-dev/formnet/internal/flow"
 )
 
@@ -135,9 +138,10 @@ func (c *capture) message(h http.Header, firstLine string, limit int64) flow.Mes
 	headers := orderedHeaders(h)
 	encoding := h.Get("Content-Encoding")
 	truncated := total > int64(len(body))
+	wasDecoded := false
 	if !truncated && encoding != "" {
 		if decoded, ok := decode(body, encoding, limit); ok {
-			body, truncated = decoded.body, decoded.truncated
+			body, truncated, wasDecoded = decoded.body, decoded.truncated, true
 		}
 	}
 	return flow.Message{
@@ -148,6 +152,7 @@ func (c *capture) message(h http.Header, firstLine string, limit int64) flow.Mes
 		BodyTruncated: truncated,
 		ContentType:   h.Get("Content-Type"),
 		Encoding:      encoding,
+		Decoded:       wasDecoded,
 	}
 }
 
@@ -156,35 +161,89 @@ type decoded struct {
 	truncated bool
 }
 
-// decode inflates a gzip or deflate body that was captured whole, up to limit bytes.
+// stageFactor bounds an inner layer of a stacked encoding at this many times the body limit.
+const stageFactor = 4
+
+// zstdWindow is the largest zstd window decoded, the 8 MiB HTTP asks senders to stay within (RFC 9659).
+const zstdWindow = 8 << 20
+
+// decode undoes the Content-Encoding of a body that was captured whole: gzip,
+// deflate, br and zstd, and a list of them, last applied first. The output is
+// cut at limit bytes, and an inner layer at stageFactor times limit, so a
+// small body that inflates without end never grows past that. A body that
+// does not decode is reported as not decoded and kept as captured.
 func decode(body []byte, encoding string, limit int64) (decoded, bool) {
-	var r io.ReadCloser
-	switch strings.ToLower(strings.TrimSpace(encoding)) {
+	layers := strings.Split(encoding, ",")
+	out := body
+	cut := false
+	applied := 0
+	for i := len(layers) - 1; i >= 0; i-- {
+		name := strings.ToLower(strings.TrimSpace(layers[i]))
+		if name == "" || name == "identity" {
+			continue
+		}
+		room := limit
+		if i > 0 {
+			room = limit * stageFactor
+		}
+		next, over, ok := decodeOne(out, name, room)
+		if !ok || (over && i > 0) {
+			return decoded{}, false
+		}
+		out, cut = next, over
+		applied++
+	}
+	if applied == 0 {
+		return decoded{}, false
+	}
+	return decoded{body: out, truncated: cut}, true
+}
+
+// decodeOne undoes one coding, reading at most room bytes of output. It
+// returns the output, whether it was cut at room, and whether it decoded.
+func decodeOne(body []byte, name string, room int64) ([]byte, bool, bool) {
+	var r io.Reader
+	switch name {
 	case "gzip", "x-gzip":
 		gr, err := gzip.NewReader(bytes.NewReader(body))
 		if err != nil {
-			return decoded{}, false
+			return nil, false, false
 		}
+		defer gr.Close()
 		r = gr
 	case "deflate":
 		// Servers send deflate both as zlib-wrapped (the standard) and raw.
 		if zr, err := zlib.NewReader(bytes.NewReader(body)); err == nil {
+			defer zr.Close()
 			r = zr
 		} else {
-			r = flate.NewReader(bytes.NewReader(body))
+			fr := flate.NewReader(bytes.NewReader(body))
+			defer fr.Close()
+			r = fr
 		}
+	case "br":
+		r = brotli.NewReader(bytes.NewReader(body))
+	case "zstd":
+		zr, err := zstd.NewReader(bytes.NewReader(body),
+			zstd.WithDecoderConcurrency(1),
+			zstd.WithDecoderLowmem(true),
+			zstd.WithDecoderMaxWindow(zstdWindow))
+		if err != nil {
+			return nil, false, false
+		}
+		defer zr.Close()
+		r = zr
 	default:
-		return decoded{}, false
+		return nil, false, false
 	}
-	defer r.Close()
-	out, err := io.ReadAll(io.LimitReader(r, limit+1))
-	if err != nil && len(out) == 0 {
-		return decoded{}, false
+	out, err := io.ReadAll(io.LimitReader(r, room+1))
+	if int64(len(out)) > room {
+		return out[:room], true, true
 	}
-	if int64(len(out)) > limit {
-		return decoded{body: out[:limit], truncated: true}, true
+	if err != nil {
+		return nil, false, false
 	}
-	return decoded{body: out}, true
+	return out, false, true
 }
 
 // counter counts bytes copied through it.
