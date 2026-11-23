@@ -49,3 +49,9 @@ The owner chose the repository's spelling, formNET, on 2026-11-02 (the family wr
 ## 2026-11-17 · the window title is FormNET
 
 The family names its apps FormX, and 8af17c9 (2026-11-05) moved formNET's title to FormNET in `index.html`, the splash, `tauri.conf.json` (`productName` and the window title), the two `.title()` calls in `src-tauri/src/main.rs` and the smoke's `pg.title()` assert. It missed `ui/app.ts`, which sets `document.title` and calls the shell's `set_window_title` at start, both still `formNET`, so the page renamed itself after load and the window job failed at `test_title_and_views`. Both now say `FormNET`. Not changed here, still `formNET`: the title bar's `formNET 2026`, the Home brand line (the smoke asserts it starts with `formNET`), the brand mark's label, the About entry and toast, the macOS application menu, the status bar titles, the Preferences prose and the CLAUDE.md naming paragraph. Those are the owner's call.
+
+## 2026-11-22 · the audit gate, the holder's name
+
+CI runs `npm audit` with no level flag, the same line FormPortal's check workflow uses (owner's answer, 2026-11-22). With no flag npm fails on any advisory, so the gate is as strict as before; what changed is that the two apps now read the same. A red gate with no code change means an advisory was published against a pinned package: bump the pin in `package.json`, run `npm install`, commit both files.
+
+The About toast names the holder, NodeAgentc, Inc., as `LICENSE` and the README do. It said "by nodemode.ai".

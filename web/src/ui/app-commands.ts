@@ -104,7 +104,7 @@ export function registerCommands(d: CommandDeps): Commands {
     { id: 'help', label: 'Proxy Setup...', keys: ['F1'], run: setup('proxy-card') },
     { id: 'help-trust-root', label: 'Trust the Root Certificate...', run: setup('ca-card') },
     { id: 'github', label: 'formNET on GitHub', run: () => { window.open('https://github.com/nodemode-dev/formNET', '_blank', 'noopener'); } },
-    { id: 'about', label: 'About formNET', run: () => { const s = st.get().status; toast(`formNET ${s?.version ?? ''} by nodemode.ai: what a website, an app or the whole machine actually does on the network.`); } },
+    { id: 'about', label: 'About formNET', run: () => { const s = st.get().status; toast(`formNET ${s?.version ?? ''} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.`); } },
   );
   void wantsNativeMenus;
   return c;
