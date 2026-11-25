@@ -7,6 +7,8 @@ Versions follow `v*.*.*` with dots. Dates are US Eastern.
 Ready to go public: the licences travel with the app, the macOS build names its app correctly, and the README shows FormNET as it is.
 
 - The desktop app now carries the licence texts of everything it ships that was only listed before: the Inter and JetBrains Mono typefaces (OFL-1.1), the terminal's xterm.js and its fit addon (MIT), the window bridge @tauri-apps/api (Apache-2.0 or MIT) and the Go standard library and runtime inside every `formnet` binary (BSD-3-Clause). They are in `licenses/`, and `NOTICES.md` names each file.
+- The desktop app also carries the licence text of every Rust crate it links, in `licenses/rust/` (303 crates). Where a crate's package holds no licence file, a note names its licence and the standard text is beside it. `tools/collect_licenses.py` refreshes the folder when `src-tauri/Cargo.lock` changes, with cargo-about where it is installed.
+- The standalone server binaries are released with `formnet_<version>_licenses.tar.gz`: `NOTICES.md`, `LICENSE` and the licence texts that apply to the server. `make release` and `./build_app --all` (and `build_app.bat --all`) write it, and `SHA256SUMS` lists it.
 - `./build_app` on a Mac names the app it makes `FormNET.app`, as the bundle is called, and its "open it" line points there.
 - The README's three pictures are retaken from this version: Flows with a request in the detail pane, a failed request's response, and Hosts.
 
