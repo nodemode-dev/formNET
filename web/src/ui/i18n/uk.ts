@@ -146,7 +146,7 @@ export const uk: Record<string, string> = {
   "Flows": "Потоки",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Збережені потоки та скільки з них показує фільтр. Клацніть для наступного показника, Shift+клац для попереднього.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET створив цей кореневий сертифікат на цьому комп'ютері. Його закритий ключ залишається в теці даних і ніколи не віддається; завантажити можна лише сертифікат. Нічого не встановлюється, доки ви самі не виконаєте команду, а в режимі Авто HTTPS розшифровується лише тоді, коли цей комп'ютер довіряє кореневому сертифікату.",
-  "FormNET on GitHub": "FormNET на GitHub",
+  "FormNET Website": "Веб-сайт FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} від NodeAgentc, Inc.: що веб-сайт, застосунок або весь комп'ютер насправді робить у мережі.",
   "Good afternoon": "Добрий день",
   "Good evening": "Добрий вечір",

@@ -147,7 +147,7 @@ export const ru: Record<string, string> = {
   "Flows": "Потоки",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Сохранённые потоки и сколько из них показывает фильтр. Щелчок показывает следующий показатель, Shift+щелчок предыдущий.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET создал этот корневой сертификат на этом компьютере. Закрытый ключ остаётся в папке данных и никогда не отдаётся; скачать можно только сертификат. Ничего не устанавливается, пока вы сами не выполните команду, а в режиме Авто HTTPS расшифровывается только после того, как этот компьютер доверяет корневому сертификату.",
-  "FormNET on GitHub": "FormNET на GitHub",
+  "FormNET Website": "Сайт FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} от NodeAgentc, Inc.: что на самом деле делает в сети сайт, приложение или весь компьютер.",
   "Good afternoon": "Добрый день",
   "Good evening": "Добрый вечер",

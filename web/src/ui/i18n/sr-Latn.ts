@@ -147,7 +147,7 @@ export const srLatn: Record<string, string> = {
   "Flows": "Tokovi",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Sačuvani tokovi i koliko ih filter prikazuje. Kliknite za sledeći prikaz, Shift+klik za prethodni.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET je napravio ovaj korenski sertifikat na ovom računaru. Njegov privatni ključ ostaje u fascikli sa podacima i nikada se ne servira; može se preuzeti samo sertifikat. Ništa se ne instalira dok sami ne pokrenete komandu, a u režimu Auto HTTPS se dešifruje tek kada ovaj računar poveruje korenskom sertifikatu.",
-  "FormNET on GitHub": "FormNET na GitHub-u",
+  "FormNET Website": "Veb-sajt programa FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}, NodeAgentc, Inc.: šta veb-sajt, aplikacija ili ceo računar zaista radi na mreži.",
   "Good afternoon": "Dobar dan",
   "Good evening": "Dobro veče",

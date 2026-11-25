@@ -146,7 +146,7 @@ export const de: Record<string, string> = {
   "Flows": "Flows",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Behaltene Flows und wie viele der Filter zeigt. Klicken für die nächste Anzeige, Shift+Klick für die vorige.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET hat dieses Stammzertifikat auf diesem Computer erzeugt. Sein privater Schlüssel bleibt im Datenordner und wird nie ausgeliefert; nur das Zertifikat lässt sich herunterladen. Nichts wird installiert, bevor Sie den Befehl selbst ausführen, und unter Auto wird HTTPS erst geöffnet, wenn dieser Computer dem Stammzertifikat vertraut.",
-  "FormNET on GitHub": "FormNET auf GitHub",
+  "FormNET Website": "FormNET-Website",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} von NodeAgentc, Inc.: was eine Website, eine App oder der ganze Rechner im Netzwerk tatsächlich tut.",
   "Good afternoon": "Guten Tag",
   "Good evening": "Guten Abend",

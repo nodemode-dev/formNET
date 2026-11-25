@@ -146,7 +146,7 @@ export const da: Record<string, string> = {
   "Flows": "Flows",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Gemte flows og hvor mange filteret viser. Klik for næste værdi, Shift+klik for forrige.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET har lavet dette rodcertifikat på denne computer. Den private nøgle bliver i datamappen og udleveres aldrig; kun certifikatet kan downloades. Intet installeres, før du selv kører kommandoen, og i Auto dekrypteres HTTPS først, når denne computer stoler på rodcertifikatet.",
-  "FormNET on GitHub": "FormNET på GitHub",
+  "FormNET Website": "FormNETs websted",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} fra NodeAgentc, Inc.: hvad et websted, en app eller hele computeren faktisk gør på netværket.",
   "Good afternoon": "God eftermiddag",
   "Good evening": "God aften",

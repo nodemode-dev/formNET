@@ -147,7 +147,7 @@ export const tr: Record<string, string> = {
   "Flows": "Akışlar",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "Saklanan akışlar ve filtrenin kaçını gösterdiği. Sonraki gösterge için tıklayın, öncekine dönmek için Shift+tıklayın.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET bu kök sertifikayı bu bilgisayarda oluşturdu. Özel anahtarı veri klasöründe kalır ve asla sunulmaz; yalnızca sertifika indirilebilir. Komutu kendiniz çalıştırana kadar hiçbir şey kurulmaz ve Otomatik modunda HTTPS yalnızca bu bilgisayar kök sertifikaya güvendiğinde çözülür.",
-  "FormNET on GitHub": "GitHub'da FormNET",
+  "FormNET Website": "FormNET Web Sitesi",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "NodeAgentc, Inc. tarafından FormNET {version}: bir web sitesinin, bir uygulamanın veya tüm bilgisayarın ağda gerçekte ne yaptığı.",
   "Good afternoon": "İyi günler",
   "Good evening": "İyi akşamlar",

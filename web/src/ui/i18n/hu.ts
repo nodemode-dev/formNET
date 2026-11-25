@@ -146,7 +146,7 @@ export const hu: Record<string, string> = {
   "Flows": "Áramlások",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "A megőrzött áramlások, és hogy hányat mutat a szűrő. Kattintson a következő értékért, Shift+kattintás az előzőért.",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "A FormNET ezen a számítógépen hozta létre ezt a gyökértanúsítványt. A privát kulcsa az adatmappában marad, és sosem kerül kiszolgálásra; csak a tanúsítvány tölthető le. Semmi sem települ, amíg Ön saját maga nem futtatja a parancsot, és Auto módban a HTTPS visszafejtése csak akkor kezdődik, ha ez a számítógép megbízik a gyökértanúsítványban.",
-  "FormNET on GitHub": "A FormNET a GitHubon",
+  "FormNET Website": "A FormNET weboldala",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}, a NodeAgentc, Inc. terméke: mit csinál valójában egy weboldal, egy alkalmazás vagy az egész gép a hálózaton.",
   "Good afternoon": "Jó napot",
   "Good evening": "Jó estét",

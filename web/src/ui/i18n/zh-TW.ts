@@ -147,7 +147,7 @@ export const zhTW: Record<string, string> = {
   "Flows": "資料流",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "保留的資料流數量，以及篩選條件顯示的數量。按一下切換下一個讀數，Shift+按一下切換上一個。",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET 在這台電腦上建立了這個根憑證。其私密金鑰留在資料目錄中，絕不會對外提供；只能下載憑證。在你自行執行指令之前不會安裝任何東西，而在「自動」模式下，只有這台電腦信任根憑證後才會解密 HTTPS。",
-  "FormNET on GitHub": "GitHub 上的 FormNET",
+  "FormNET Website": "FormNET 網站",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version}，由 NodeAgentc, Inc. 開發：一個網站、一個 App 或整台電腦在網路上實際做了什麼。",
   "Good afternoon": "午安",
   "Good evening": "晚上好",

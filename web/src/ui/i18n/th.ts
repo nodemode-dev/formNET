@@ -147,7 +147,7 @@ export const th: Record<string, string> = {
   "Flows": "โฟลว์",
   "Flows kept, and how many the filter shows. Click for the next readout, Shift+click for the previous.": "โฟลว์ที่เก็บไว้ และจำนวนที่ตัวกรองแสดง คลิกเพื่อดูค่าถัดไป Shift+คลิกเพื่อดูค่าก่อนหน้า",
   "FormNET made this root on this computer. Its private key stays in the data folder and is never served; only the certificate can be downloaded. Nothing is installed until you run the command yourself, and in Auto HTTPS is opened only once this computer trusts the root.": "FormNET สร้างใบรับรองรากนี้บนคอมพิวเตอร์เครื่องนี้ คีย์ส่วนตัวอยู่ในโฟลเดอร์ข้อมูลและไม่เคยถูกให้บริการ ดาวน์โหลดได้เฉพาะใบรับรอง จะไม่มีการติดตั้งอะไรจนกว่าคุณจะรันคำสั่งเอง และในโหมดอัตโนมัติ HTTPS จะถูกถอดรหัสก็ต่อเมื่อคอมพิวเตอร์เครื่องนี้เชื่อถือใบรับรองรากแล้วเท่านั้น",
-  "FormNET on GitHub": "FormNET บน GitHub",
+  "FormNET Website": "เว็บไซต์ FormNET",
   "FormNET {version} by NodeAgentc, Inc.: what a website, an app or the whole machine actually does on the network.": "FormNET {version} โดย NodeAgentc, Inc.: สิ่งที่เว็บไซต์ แอป หรือทั้งเครื่องทำบนเครือข่ายจริง ๆ",
   "Good afternoon": "สวัสดีตอนบ่าย",
   "Good evening": "สวัสดีตอนเย็น",

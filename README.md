@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version v0.9.0" src="https://img.shields.io/badge/version-v0.9.0-eef0f4?style=flat-square">
+  <img alt="version v0.10.0" src="https://img.shields.io/badge/version-v0.10.0-eef0f4?style=flat-square">
   <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white">
   <img alt="TypeScript and Vite" src="https://img.shields.io/badge/TypeScript-Vite-3178c6?style=flat-square">
   <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-native-2f7bf5?style=flat-square">
@@ -55,11 +55,11 @@
     </td>
     <td width="25%" valign="top">
       <h3>Nothing leaves</h3>
-      Both listeners bind loopback only unless you let a phone or another computer use the proxy, and recordings stay in memory until you export them.
+      Both listeners bind loopback only unless you let a phone or another computer use the proxy, and recordings stay in memory until you save or export them.
     </td>
     <td width="25%" valign="top">
       <h3>Agent-ready</h3>
-      Scripts read the same recording over a token-guarded local API, and <code>formnet snapshot</code> prints the connection table as JSON.
+      Agents read the same recording through <code>formnet mcp</code>, an MCP server with 10 tools; scripts use a token-guarded local API, and <code>formnet snapshot</code> prints the connection table as JSON.
     </td>
   </tr>
 </table>
@@ -83,6 +83,16 @@
       Requests, errors and bytes each way per host. Widely documented third parties get a reading-aid label, never a verdict.
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Change what passes</h3>
+      Rewrite headers, addresses, status or bodies, answer from a local file, block a host, pause a request to edit it, resend any request, or slow everything to 3G. On macOS and Windows FormNET can point the system proxy at itself while it runs.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Find it, keep it</h3>
+      Filter by status, method, type, size, time, process or host, or type <code>status-code:404</code> as in a browser's tools; search inside bodies; read JSON, HTML, images and WebSocket messages; save a session, import a HAR, copy everything as cURL.
+    </td>
+  </tr>
 </table>
 
 ## Everything in the box
@@ -95,11 +105,11 @@
     </td>
     <td width="33%" valign="top">
       <h4>Proxy</h4>
-      Plain HTTP forwarding · CONNECT tunnels · TLS interception with a local root · Passthrough patterns
+      Plain HTTP forwarding · CONNECT tunnels · TLS interception with a local root · HTTP/2 and gRPC · WebSocket messages · Passthrough patterns · Rules, breakpoints and throttling · System proxy on macOS and Windows · Upstream proxy · Capture from other devices
     </td>
     <td width="33%" valign="top">
       <h4>Formats</h4>
-      Exports: HAR 1.2 of any filtered view · Machine snapshot: JSON
+      Exports: HAR 1.2 and sessions of any filtered view · Imports: HAR 1.2 and sessions · Copy All as cURL: sh, PowerShell, cmd · Machine snapshot: JSON
     </td>
   </tr>
 </table>
@@ -107,6 +117,7 @@
 ## Built for agents
 
 ```sh
+./bin/formnet mcp        # an MCP server on stdio for agents such as Claude Code
 ./bin/formnet snapshot   # the machine's connection table once, as JSON
 ./bin/formnet ca         # root certificate path, fingerprint and trust state
 curl -H "Authorization: Bearer $(cat ~/formnet/token)" http://127.0.0.1:8760/api/flows   # recorded flows
@@ -114,11 +125,14 @@ curl -H "Authorization: Bearer $(cat ~/formnet/token)" http://127.0.0.1:8760/api
 
 Also `/api/flows/{id}`, `/api/hosts`, `/api/machine`, `/api/export/har` and `/api/stream`. See [`AGENTS.md`](AGENTS.md).
 
+`formnet mcp` reads the running FormNET and starts nothing. Its 10 tools: six read flows, hosts, the machine table, the proxy and the root certificate; one exports a HAR into FormNET's own exports folder; three change things (clear the recording, the HTTPS choice, the passthrough list) and ask you first. Passwords, tokens and cookies read `[redacted]` in everything an agent sees unless you approve otherwise. Register it as a stdio server, for example in a project's `.mcp.json`: `{"mcpServers": {"formnet": {"command": "formnet", "args": ["mcp"]}}}`. The skill pack `formnet-inspector` (in `.claude/skills/`, mirrored in `.agents/skills/`) teaches an agent to route a program through the proxy, trust the root, read what it sent and export a HAR.
+
 ## Under the hood
 
 - **One binary:** a Go server with the web client embedded, plus a Tauri 2 window around the same binary for the desktop app.
 - **Loopback by default:** the API and the page answer on loopback only, always; the proxy also listens on the network only while "capture from other devices" is on, for the addresses you allow. The proxy never connects to loopback through a host name.
 - **Local root:** the certificate is made on first run, its private key never leaves `~/formnet`, and HTTPS is opened only once you trust it.
+- **Updates:** through FormPortal only. FormNET has no updater of its own and never checks for one.
 - **Tested:** 82 Go tests and a Playwright window smoke in CI.
 
 ## Download
@@ -129,7 +143,7 @@ Also `/api/flows/{id}`, `/api/hosts`, `/api/machine`, `/api/export/har` and `/ap
 | Windows | [Download FormNET for Windows](https://formai.studio/get/formnet/windows) | [FormNET releases on FormCompiler](https://github.com/nodemode-dev/formcompiler/releases?q=formNET-v&expanded=true) |
 | Linux | [Download FormNET for Linux](https://formai.studio/get/formnet/linux) | [FormNET releases on FormCompiler](https://github.com/nodemode-dev/formcompiler/releases?q=formNET-v&expanded=true) |
 
-All FormNET builds are compiled and released from [FormCompiler](https://github.com/nodemode-dev/formcompiler); this repo holds the source.
+All FormNET builds are compiled and released from [FormCompiler](https://github.com/nodemode-dev/formcompiler); this repo holds the source. Updates come through FormPortal, the family's app for installing and updating its apps.
 
 ## Run it from source
 
@@ -156,7 +170,7 @@ The client and API listen on 127.0.0.1:8760 and the proxy on 127.0.0.1:8761 (loo
 
 ## Repository
 
-`cmd/formnet/` and `internal/` (command, proxy, flow store, CA, machine view, server) · `web/` (client) · `src-tauri/` (desktop window).
+`cmd/formnet/` and `internal/` (command, proxy, flow store, CA, machine view, server, rules, system proxy, MCP server, terminal engine) · `web/` (client) · `src-tauri/` (desktop window) · `.claude/skills/` (the skill pack).
 
 Agents: [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md)
 
@@ -166,8 +180,8 @@ Agents: [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md)
 
 | Maintainer | Role |
 |---|---|
-| [@gbarnai](https://github.com/gbarnai) | Owner |
-| [@nodemode-ai](https://github.com/nodemode-ai) | Co-Owner |
+| [@nodemode-ai](https://github.com/nodemode-ai) (Mackin) | Owner |
+| [@gbarnai](https://github.com/gbarnai) (Greg) | Co-Owner |
 
 Code owners are set in [`.github/CODEOWNERS`](.github/CODEOWNERS).
 
