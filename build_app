@@ -12,7 +12,7 @@ Builds FormNET start to finish: the desktop app for this computer, with the serv
   3. builds the web client into web/dist (embedded into the binary)
   4. compiles bin/formnet for this computer
   5. checks the desktop toolchain (Rust through rustup, the Xcode tools on a Mac, WebKitGTK on Linux)
-  6. bundles the desktop app: formnet.app and a .dmg on macOS; .deb, .rpm and .AppImage on Linux,
+  6. bundles the desktop app: FormNET.app and a .dmg on macOS; .deb, .rpm and .AppImage on Linux,
      in src-tauri/target/release/bundle
 
 Options:
