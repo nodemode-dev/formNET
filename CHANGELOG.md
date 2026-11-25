@@ -2,6 +2,20 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.9.0 · 2026-11-22
+
+A tool for every day: find any request, read any body, keep a recording.
+
+- Filters above Flows: status, errors, method and type at one click; More filters for size, duration, process, the hosts to focus on and the hosts to leave out. Or type them as browser developer tools take them: `status-code:404`, `method:POST`, `domain:*.example.com`, `mime-type:image/`, `larger-than:100k`, `process:curl`, with a `-` in front to leave those out. The Body switch searches inside the recorded bodies.
+- Bodies read properly: indented, coloured JSON, HTML and XML with folding, Raw, Hex, images and forms, and find. A body of several megabytes shows its first lines at once and the rest within a second.
+- WebSocket messages, sent and received, live in a Messages tab.
+- HTTP/2: browsers and gRPC programs speak HTTP/2 to FormNET where it opens HTTPS, and Flows shows what each side spoke.
+- Sessions: File > Save Session keeps a recording as a `.formnet` file (it holds the passwords and tokens the requests carried, and the dialog says so), Open Session brings one back, Import HAR reads a HAR from a browser or another tool.
+- Copy All as cURL: one script for sh, PowerShell or cmd that sends every listed request again.
+- Upstream proxy: FormNET can send its traffic on through your company's proxy (HTTP, HTTPS or SOCKS5, with a list of hosts reached directly), in Preferences > Capture.
+- The Process column names the program behind a short request, such as one curl call, on macOS and Linux. Windows still names programs every 2 seconds, so very short requests there may show none.
+- Every label added in 0.7.0, 0.8.0 and 0.9.0 is translated in all the family's languages.
+
 ## 0.8.0 · 2026-11-22
 
 Change what passes through FormNET, and capture a phone.

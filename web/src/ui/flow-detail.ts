@@ -1,20 +1,24 @@
 import { api, HTTPError } from "../api.ts";
 import { copyButton, h } from "../dom.ts";
-import { bytes, clock, dateTime, isImageType, isJSONType, isTextType, millis, prettyJSON, shellQuote } from "../format.ts";
+import { bytes, clock, dateTime, millis, shellQuote } from "../format.ts";
 import type { State, Store } from "../state.ts";
-import type { Body, FlowDetail, Message } from "../types.ts";
-import { patchList, setClass, setDisabled, setHidden, setText, setTitle, swapMedia } from "./dom";
+import type { FlowDetail } from "../types.ts";
+import { flowData } from "../types-data.ts";
+import { BodyViewer } from "./body-viewer";
+import { patchList, setClass, setDisabled, setHidden, setText, setTitle } from "./dom";
 import { onLanguage, t } from "./i18n";
 import { icon } from "./icons";
 import { ResendDialog } from "./resend-dialog";
+import { WsMessagesPane } from "./ws-messages";
 import { ruleFromFlow } from "./panels/rules";
 import { toast } from "./toast";
 
-type Tab = "summary" | "request" | "response" | "timing";
+type Tab = "summary" | "request" | "response" | "messages" | "timing";
 const tabs: { id: Tab; label: string }[] = [
   { id: "summary", label: "Summary" },
   { id: "request", label: "Request" },
   { id: "response", label: "Response" },
+  { id: "messages", label: "Messages" },
   { id: "timing", label: "Timing" },
 ];
 
@@ -38,6 +42,7 @@ export function flowDetail(store: Store): HTMLElement {
     request: sidePane("Request", false),
     response: sidePane("Response", true),
     timing: timingPane(),
+    messages: messagesPane(),
   };
   const body = h("div", { class: "detail-body" }, loading, ...tabs.map((x) => panes[x.id].el));
   const closeBtn = h("button", { type: "button", class: "cv-icon-btn", title: t("Close details"), "aria-label": t("Close details"), onClick: () => store.update({ selectedId: null }) });
@@ -59,7 +64,10 @@ export function flowDetail(store: Store): HTMLElement {
   });
 
   const paint = () => {
+    const ws = current?.kind === "websocket";
+    if (tab === "messages" && current && !ws) tab = "summary";
     for (const b of tabBar.children) {
+      setDisabled(b as HTMLButtonElement, (b as HTMLElement).dataset["tab"] === "messages" && !ws);
       const on = (b as HTMLElement).dataset["tab"] === tab;
       setClass(b, "is-on", on);
       if (b.getAttribute("aria-selected") !== String(on)) b.setAttribute("aria-selected", String(on));
@@ -132,7 +140,7 @@ function kv(labels: string[]): { el: HTMLElement; set: (values: (string | number
 function summaryPane(store: Store): Pane {
   let f: FlowDetail | null = null;
   const odd = h("span", { class: "warn small" }, t("method contains unusual characters"));
-  const rows = kv(["Kind", "Status", "Protocol", "Started", "Duration", "Client", "Host", "TLS", "Sent", "Received", "Request type", "Response type", "Rules", "Notes"]);
+  const rows = kv(["Kind", "Status", "Protocol", "Started", "Duration", "Client", "Host", "TLS", "Sent", "Received", "Request type", "Response type", "Rules", "Notes", "Upstream proxy", "Source"]);
   const [rulesDd, notesDd] = Array.from(rows.el.querySelectorAll<HTMLElement>("dd")).slice(12, 14);
   for (const dd of [rulesDd, notesDd]) dd?.classList.add("kv-one");
   const ruleBtn = h("button", { type: "button", class: "cv-btn cv-btn-ghost", onClick: () => { if (f) ruleFromFlow(store, f); } }, t("Make a Rule...")) as HTMLButtonElement;
@@ -186,7 +194,7 @@ function summaryPane(store: Store): Pane {
       rows.set([
         f.kind,
         f.error ? t("error: {error}").replace("{error}", f.error) : f.paused ? t(f.paused === "response" ? "paused at the response" : "paused at the request") : f.status || (f.pending ? t("pending") : ""),
-        f.protocol,
+        protoText(f),
         dateTime(f.start),
         f.pending ? t("pending") : millis(f.duration_ms),
         f.client_process && !f.client ? t("{process} (pid {pid})").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")) : f.client_process ? t("{process} (pid {pid}) from {client}").replace("{process}", f.client_process).replace("{pid}", String(f.client_pid ?? "?")).replace("{client}", f.client) : f.client,
@@ -198,6 +206,8 @@ function summaryPane(store: Store): Pane {
         f.response?.content_type,
         (f.rules ?? []).join(", "),
         (f.notes ?? []).join(" "),
+        flowData(f).upstream ?? t("direct"),
+        flowData(f).from_session ? t(flowData(f).imported === "har" ? "Imported from a HAR file" : "Opened from a session file") : t("Captured in this run"),
       ]);
       for (const dd of [rulesDd, notesDd]) if (dd) setTitle(dd, dd.textContent ?? "");
       setHidden(refused, f.kind !== "refused");
@@ -268,29 +278,21 @@ const SIDE_TEXT = {
 } as const;
 
 function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
-  let text = "";
-  let shownBody = "";
   const words = SIDE_TEXT[label];
   const headSize = h("span", { class: "dim" });
   const bodySize = h("span", { class: "dim" });
   const waiting = h("p", { class: "dim" });
   const none = h("p", { class: "dim" }, t("none"));
   const list = h("dl", { class: "kv headers" });
-  const enc = h("p", { class: "small" });
-  const trunc = h("p", { class: "warn" });
-  const empty = h("p", { class: "dim" });
-  const img = h("img", { class: "preview", alt: t(words.image) }) as HTMLImageElement;
-  const copyRow = h("div", { class: "cv-improve" }, copyButton("Copy body", () => text));
-  const pre = h("pre", { class: "body mono" });
-  const binary = h("p", { class: "dim" });
-  for (const n of [none, enc, trunc, empty, img, copyRow, pre, binary]) n.hidden = true;
+  const viewer = new BodyViewer(words.body);
+  none.hidden = true;
   const el = h(
     "div",
     {},
     h("h3", {}, t(words.headers), headSize),
     h("div", { class: reserve ? "reserve-headers" : "" }, waiting, none, list),
     h("h3", {}, t(words.body), bodySize),
-    h("div", { class: reserve ? "reserve-body" : "" }, enc, trunc, empty, img, copyRow, pre, binary),
+    viewer.el,
   );
   return {
     el,
@@ -308,48 +310,17 @@ function sidePane(label: "Request" | "Response", reserve: boolean): Pane {
         update: (node, { x }) => setText(node.lastElementChild, x.value),
       });
       setText(bodySize, m ? ` ${bytes(m.body_bytes)}${m.encoding && !b?.encoding ? `, ${m.encoding}` : ""}` : "");
-      patchBody(m, b);
+      const empty = !m ? t(f.pending ? "No response yet." : "No response was recorded.") : m.body_bytes > 0 ? t("{size} not captured").replace("{size}", bytes(m.body_bytes)) : t("empty");
+      viewer.show(`${f.id}:${f.pending ? "pending" : "done"}:${b?.bytes ?? -1}`, b ?? null, m?.content_type ?? "", empty);
     },
   };
-
-  function patchBody(m: Message | undefined, b: Body | undefined): void {
-    const has = !!m && !!b && b.bytes > 0;
-    const image = has && !!b?.base64 && isImageType(m?.content_type);
-    const isText = has && !image && b?.text !== undefined;
-    setText(empty, !m ? "" : m.body_bytes > 0 ? t("{size} not captured").replace("{size}", bytes(m.body_bytes)) : t("empty"));
-    setHidden(empty, !m || has);
-    const encoding = has ? b?.encoding ?? "" : "";
-    setText(enc, !encoding ? "" : t(b?.decoded ? "{encoding}, decoded" : "{encoding}, not decoded").replace("{encoding}", encoding));
-    setClass(enc, "warn", !!encoding && !b?.decoded);
-    setClass(enc, "dim", !!encoding && !!b?.decoded);
-    setHidden(enc, !encoding);
-    setText(trunc, has && b?.truncated && m ? t("Showing the first {kept} of {size}; the rest was not kept (body limit).").replace("{kept}", bytes(b.bytes)).replace("{size}", bytes(m.body_bytes)) : "");
-    setHidden(trunc, !(has && b?.truncated));
-    setHidden(img, !image);
-    if (image && m && b?.base64) {
-      const src = `data:${m.content_type.split(";")[0] ?? "image/png"};base64,${b.base64}`;
-      if (img.getAttribute("src") !== src) void swapMedia(img, src).catch(() => undefined);
-    }
-    text = isText ? b?.text ?? "" : "";
-    const shown = isText && m ? (isJSONType(m.content_type) ? prettyJSON(text) : text) : "";
-    if (shown !== shownBody) {
-      shownBody = shown;
-      pre.textContent = shown;
-    }
-    setHidden(copyRow, !isText);
-    setHidden(pre, !isText);
-    const bin = has && !image && !isText && m && b;
-    setText(binary, bin ? t(BINARY_TEXT[`${isTextType(m.content_type) ? "text" : "binary"}${m.encoding ? "-enc" : ""}`]).replace("{size}", bytes(b.bytes)).replace("{encoding}", m.encoding ?? "") : "");
-    setHidden(binary, !bin);
-  }
 }
 
-const BINARY_TEXT: Record<string, string> = {
-  binary: "{size} of binary data; export a HAR to get the bytes.",
-  "binary-enc": "{size} of binary data ({encoding}); export a HAR to get the bytes.",
-  text: "{size} of text that is not valid UTF-8; export a HAR to get the bytes.",
-  "text-enc": "{size} of text that is not valid UTF-8 ({encoding}); export a HAR to get the bytes.",
-};
+/** The Messages tab: a WebSocket's messages, fetched as the stream says they arrive. */
+function messagesPane(): Pane {
+  const pane = new WsMessagesPane();
+  return { el: pane.el, patch: (f) => pane.show(flowData(f)) };
+}
 
 const SEGMENT_TEXT = ["connect {time}", "waiting {time}", "receiving {time}"];
 
@@ -388,6 +359,13 @@ function timingPane(): Pane {
 const skipInCurl = new Set(["host", "content-length", "connection", "proxy-connection", "accept-encoding"]);
 
 const plainMethod = /^[A-Za-z]+$/;
+
+/** What the program spoke to FormNET and what the server answered with, as one line. */
+function protoText(f: FlowDetail): string {
+  const d = flowData(f);
+  if (d.client_proto && d.server_proto && d.client_proto !== d.server_proto) return t("{client} from the program, {server} to the server").replace("{client}", d.client_proto).replace("{server}", d.server_proto);
+  return d.client_proto || d.server_proto || f.protocol;
+}
 
 function asCurl(f: FlowDetail): string {
   const parts = ["curl", "-X", shellQuote(f.method), shellQuote(f.url)];

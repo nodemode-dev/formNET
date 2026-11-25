@@ -93,6 +93,8 @@ type Proxy struct {
 	refused   map[string]time.Time // last refused handshake per program and host
 
 	ext atomic.Pointer[trafficState] // rules, throttle, breakpoints and remote capture (traffic.go)
+
+	wire wireState // WebSocket message logs (wsframes.go) and the upstream proxy (upstream.go)
 }
 
 // DefaultTrustInterval is how often auto mode reads the root's trust state again.
@@ -133,8 +135,8 @@ func New(opts Options) *Proxy {
 		guard:       newGuard(opts.Refuse, opts.Resolver),
 	}
 	p.transport = &http.Transport{
-		Proxy:                 nil,
-		DialContext:           p.guard.DialContext,
+		Proxy:                 p.upstreamURL,
+		DialContext:           p.dialTransport,
 		TLSClientConfig:       p.upstreamTLS(""),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
@@ -145,6 +147,7 @@ func New(opts Options) *Proxy {
 		// what it relays; the client's own Accept-Encoding goes through as sent.
 		DisableCompression: true,
 	}
+	p.transport.OnProxyConnectResponse = p.upstreamConnectResponse
 	return p
 }
 
@@ -180,7 +183,7 @@ func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 	p.mu.Unlock()
 	p.log.Info("proxy listening", "addr", ln.Addr().String())
 	go p.followTrust(ctx)
-	srv := &http.Server{Handler: p, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second}
+	srv := &http.Server{Handler: p, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second, ConnState: p.askOwner}
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -238,6 +241,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // serveOrigin handles a request whose origin (client, scheme, host) is known,
 // directly or inside an opened tunnel.
 func (p *Proxy) serveOrigin(w http.ResponseWriter, r *http.Request, o origin) {
+	o.proto = r.Proto
 	if isWebSocketUpgrade(r.Header) {
 		p.handleWebSocket(w, r, o)
 		return
@@ -254,6 +258,7 @@ type origin struct {
 	scheme string
 	host   string
 	port   int
+	proto  string // the protocol the client spoke to FormNET, once a request is read
 }
 
 func (o origin) hostPort() string {
@@ -302,6 +307,7 @@ func (p *Proxy) newFlow(kind string, o origin, method, rawURL string) flow.Flow 
 	if f.Host == "" {
 		f.Scheme, f.Host, f.Port = o.scheme, o.host, o.port
 	}
+	f.ClientProto, f.Upstream = o.proto, p.upstreamLabel(o.host)
 	if p.opts.Owner != nil {
 		if pid, name, ok := p.opts.Owner(o.client); ok {
 			f.ClientPID, f.ClientProcess = pid, name

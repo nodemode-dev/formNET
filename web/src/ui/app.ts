@@ -1,4 +1,5 @@
 import type { Store, View } from '../state.ts';
+import { startFlowQuery } from '../filters.ts';
 import { connectLive } from '../live.ts';
 import { flowDetail } from './flow-detail.ts';
 import { flowsView } from './flows-view.ts';
@@ -57,7 +58,8 @@ export function startApp(store: Store, onLost: () => void): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>('.cv-tab[data-view]');
     if (b?.dataset.view) commands.run(`view-${b.dataset.view}`);
   });
-  const options = new OptionsBar(q(root, '.cv-options'), store);
+  const query = startFlowQuery(store, () => store.update((s) => ({ filterEpoch: s.filterEpoch + 1 })));
+  const options = new OptionsBar(q(root, '.cv-options'), store, query);
   stage.append(flowsView(store), hostsView(store), machineView(store), setupView(store), flowDetail(store));
   const home = new HomeScreen(stage, { store, autoShow: () => loadPrefs().autoShowHome, afterClear: () => loadPrefs().homeOnClear });
   const brand = q(root, '.cv-brand');

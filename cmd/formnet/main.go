@@ -109,6 +109,7 @@ Settings (environment):
   FORMNET_SYSTEM_PROXY      1 to point the system proxy at formnet while it runs, 0 not to (macOS, Windows); default off
   FORMNET_REMOTE_CAPTURE    1 to let other devices use the proxy on this computer's network addresses, 0 not to; default off
   FORMNET_REMOTE_ALLOW      addresses or CIDR ranges allowed to, comma-separated; at least one is needed to turn it on
+  FORMNET_UPSTREAM_PROXY    http://, https:// or socks5://[user:password@]host:port that formnet's own connections go through, or off; for this run only
 
 Interception, the passthrough list and the system proxy chosen in the web
 client are kept in <data>/settings.json; FORMNET_INTERCEPT,
@@ -204,11 +205,12 @@ func serve(stdout, stderr io.Writer) int {
 		Passthrough:   passthrough,
 		InterceptMode: mode,
 		Trusted:       authority.TrustedNow,
-		Owner:         monitor.Owner,
+		Owner:         clientOwner(monitor, store),
 		Refuse:        []string{apiAddr, proxyAddr},
 		Log:           log,
 	})
 	startRemote := useTraffic(px, cfg, saved, log)
+	useUpstream(px, cfg, saved, log)
 	proxyErr := make(chan error, 1)
 	go func() { proxyErr <- px.Serve(ctx, bound.proxy) }()
 
@@ -217,7 +219,7 @@ func serve(stdout, stderr io.Writer) int {
 	terminals := terminal.New(terminal.Options{APIAddr: apiAddr, ProxyAddr: proxyAddr, CAPath: info.Path, Log: log})
 	defer terminals.Close()
 	api := &http.Server{
-		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, SystemProxy: systemProxy, BodyLimit: cfg.BodyLimit, Terminals: terminals, Traffic: px}),
+		Handler:           server.Handler(server.Deps{Addr: apiAddr, Token: token, Store: store, Proxy: px, CA: authority, Machine: monitor, Dist: formnet.Dist(), Log: log, Notices: bound.notices, Quit: stop, Remember: remember, SystemProxy: systemProxy, BodyLimit: cfg.BodyLimit, Terminals: terminals, Traffic: px, Protocol: px, Data: cfg.Data}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}

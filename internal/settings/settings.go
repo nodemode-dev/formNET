@@ -31,6 +31,7 @@ type Settings struct {
 	Throttle    *Throttle    `json:"throttle,omitempty"`    // absent: off (traffic.go)
 	Remote      *Remote      `json:"remote,omitempty"`      // absent: off, empty allow list
 	Breakpoints *Breakpoints `json:"breakpoints,omitempty"` // absent: 60 s, 20 at once
+	Upstream    *Upstream    `json:"upstream,omitempty"`    // absent: no upstream proxy (upstream.go)
 }
 
 // Defaults is what a first start uses.

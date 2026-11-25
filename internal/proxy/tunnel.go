@@ -15,7 +15,7 @@ import (
 
 // tunnel answers a CONNECT the proxy will not open: dial, confirm, relay and count.
 func (p *Proxy) tunnel(hj http.Hijacker, o origin) {
-	upstream, err := p.guard.DialContext(context.Background(), "tcp", o.hostPort())
+	upstream, err := p.dialOut(context.Background(), o.hostPort())
 	if err != nil {
 		conn, _, herr := hj.Hijack()
 		if herr != nil {
@@ -48,7 +48,7 @@ func (p *Proxy) tunnel(hj http.Hijacker, o origin) {
 
 // relay dials the upstream for an already confirmed CONNECT and relays it.
 func (p *Proxy) relay(pc *peekedConn, o origin) {
-	upstream, err := p.guard.DialContext(context.Background(), "tcp", o.hostPort())
+	upstream, err := p.dialOut(context.Background(), o.hostPort())
 	if err != nil {
 		f := p.newFlow(flow.KindTunnel, o, http.MethodConnect, "https://"+o.hostPort())
 		f.Status = statusFor(err)
