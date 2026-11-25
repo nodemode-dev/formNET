@@ -1,0 +1,1 @@
+objc2-core-foundation 0.3.2 declares the licence Zlib OR Apache-2.0 OR MIT in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://github.com/madsmtm/objc2.

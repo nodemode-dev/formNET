@@ -1,6 +1,6 @@
 # Third-party notices
 
-FormNET is Copyright 2026 NodeAgentc, Inc. and licensed under the Apache License 2.0 (see `LICENSE`). It distributes the following third-party works.
+FormNET is Copyright 2026 NodeAgentc, Inc. and licensed under the Apache License 2.0 (see `LICENSE`). It distributes the following third-party works. The desktop app carries this file, `LICENSE` and the whole `licenses/` folder. The standalone server binaries (`make release` or `./build_app --all`) are released beside `formnet_<version>_licenses.tar.gz`, which holds this file, `LICENSE` and `licenses/` without `licenses/rust/`: the server is Go with the page embedded and links no Rust crate.
 
 ## The page (web client)
 
@@ -34,6 +34,8 @@ Linked into the `formnet` binary to decode `br` and `zstd` bodies for display an
 ## The desktop shell's crates (src-tauri)
 
 Every Rust crate linked into `formnet-desktop` for macOS (aarch64-apple-darwin, x86_64-apple-darwin), Windows (x86_64-pc-windows-msvc) or Linux (x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu), resolved from `src-tauri/Cargo.lock`: the normal dependency tree with default features, without build dependencies and proc-macro crates, which run at compile time and are not part of the program. Licence and source are the `license` and `repository` fields of `cargo metadata --format-version 1`. Where a crate offers a choice of licences, the recipient may use any one of them.
+
+The crates' licence texts are in `licenses/rust/<crate>-<version>/`, copied unchanged from each crate's package by `tools/collect_licenses.py` (or, where cargo-about is installed, in `licenses/rust-src-tauri.html`, which the same script writes from `src-tauri/about.toml` and `src-tauri/about.hbs`). The script takes every crate reached through normal dependencies on the five targets; because `cargo metadata` joins the features of build and normal dependencies, that folder covers 303 crates, a superset of this table. 18 crates hold no licence file in their package: alloc-stdlib 0.3.0 (BSD-3-Clause), block2 0.6.2, dlopen2 0.8.2, objc2 0.6.5, objc2-encode 4.1.0, objc2-foundation 0.3.2, webview2-com 0.39.1 and webview2-com-sys 0.39.1 (MIT), libappindicator-sys 0.9.0 (Apache-2.0 OR MIT), dispatch2 0.3.1, objc2-app-kit, objc2-core-foundation, objc2-core-graphics, objc2-exception-helper 0.1.1, objc2-io-surface, objc2-quartz-core and objc2-web-kit 0.3.2 (Zlib OR Apache-2.0 OR MIT), and selectors 0.38.0 (MPL-2.0). Each has a `NOTE.txt` in its folder naming its licence and source, and the standard texts of those licences are in `licenses/rust/standard/`.
 
 `option-ext` 0.2.0 is used unmodified under the Mozilla Public License 2.0; its source code is available from https://crates.io/crates/option-ext/0.2.0 and from its repository listed below, and the MPL-2.0 text is at https://mozilla.org/MPL/2.0/. The `icu_*`, `litemap`, `potential_utf`, `tinystr`, `writeable`, `yoke`, `zerofrom`, `zerotrie`, `zerovec` and `unicode-ident` crates include Unicode data under the Unicode License v3 (https://www.unicode.org/license.txt).
 

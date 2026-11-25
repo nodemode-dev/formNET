@@ -1,0 +1,1 @@
+webview2-com 0.39.1 declares the licence MIT in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://github.com/wravery/webview2-rs.
