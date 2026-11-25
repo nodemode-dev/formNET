@@ -4,7 +4,8 @@ import { el, setText, setValue } from '../dom';
 import { icon } from '../icons';
 import { t } from '../i18n';
 import { copyInto, note, row } from './capture';
-import { richText } from './controls';
+import { setTerminalCapture, terminalCapture } from '../prefs';
+import { checkRow, richText } from './controls';
 import { dataFolder } from './storage';
 
 const ROUTES = ['/api/flows', '/api/flows/{id}', '/api/hosts', '/api/machine', '/api/export/har', '/api/stream'];
@@ -19,6 +20,7 @@ export class AgentsSection {
   private readonly tokenPath = el<HTMLInputElement>('<input class="cv-input" type="text" readonly aria-label="Token file" spellcheck="false" dir="ltr">');
   private readonly example = el<HTMLInputElement>('<input class="cv-input" type="text" readonly aria-label="Example" spellcheck="false" dir="ltr">');
   private readonly copied = el('<p class="cv-note" role="status" style="min-height: 1.4em"></p>');
+  private readonly capture = checkRow('Send the traffic of new terminal tabs to Flows', (v) => setTerminalCapture(v));
   private shown = false;
 
   constructor() {
@@ -33,7 +35,9 @@ export class AgentsSection {
     list.innerHTML = ROUTES.map((r) => `<code>${r}</code>`).join(', ');
     richText(routes, 'Routes: {routes}. Every call carries {header} with the token; the event stream and the downloads take it as {query}.', { routes: list, header: code('Authorization: Bearer'), query: code('?token=') });
     this.el.append(row('API address', this.address), row('Token', this.token), keyBar, row('Token file', this.tokenPath), row('Example', this.example), bar, this.copied, routes,
-      note('The token is this run\'s: the server writes a new one each time it starts. Loopback is not a trust boundary, since every program on this computer shares it; the token is what keeps a recording to the people who can read that file. It is shown masked; Show reveals it until this dialog closes.'));
+      note('The token is this run\'s: the server writes a new one each time it starts. Loopback is not a trust boundary, since every program on this computer shares it; the token is what keeps a recording to the people who can read that file. It is shown masked; Show reveals it until this dialog closes.'),
+      this.capture.el, note('A new terminal tab then gets this run\'s proxy and root certificate in its environment, so the programs started there appear in Flows. Tabs already open keep what they had.'));
+    this.capture.set(terminalCapture());
     this.paintToken();
     this.refresh(null);
   }
@@ -52,6 +56,7 @@ export class AgentsSection {
   refresh(status: Status | null): void {
     const folder = dataFolder(status), sep = folder.includes('\\') ? '\\' : '/';
     const file = folder ? `${folder}${sep}token` : '~/formnet/token';
+    this.capture.set(terminalCapture());
     setValue(this.address, location.origin);
     setValue(this.tokenPath, file);
     setValue(this.example, `curl -H "Authorization: Bearer $(cat ${file.includes(' ') ? `'${file}'` : file})" ${location.origin}/api/flows`);
