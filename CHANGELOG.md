@@ -2,6 +2,14 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.10.1 · 2026-11-25
+
+The community files the family's public repositories carry.
+
+- `CONTRIBUTING.md`: where to start, how to set up, the checks to run before a pull request, what will not be accepted (anything that breaks FormNET's promises: this computer only, the root key never served, no cookie or telemetry, no updater), how changes land and who makes a release.
+- `CODE_OF_CONDUCT.md`: how people here treat each other, and how to report it when they do not. It names sharing someone else's recording, with their passwords and tokens in it, as publishing private information.
+- The README points to both.
+
 ## 0.10.0 · 2026-11-22
 
 The documents match the app.

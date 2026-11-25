@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version v0.10.0" src="https://img.shields.io/badge/version-v0.10.0-eef0f4?style=flat-square">
+  <img alt="version v0.10.1" src="https://img.shields.io/badge/version-v0.10.1-eef0f4?style=flat-square">
   <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white">
   <img alt="TypeScript and Vite" src="https://img.shields.io/badge/TypeScript-Vite-3178c6?style=flat-square">
   <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-native-2f7bf5?style=flat-square">
@@ -166,7 +166,7 @@ The client and API listen on 127.0.0.1:8760 and the proxy on 127.0.0.1:8761 (loo
 > [!IMPORTANT]
 > **Status:** early (v0.1). The desktop window source has not been compiled yet, and the process column in Flows is filled only where the platform reports it.
 
-**Contributing:** branch from `main`, keep changes to source here, and leave packaging and releases to formcompiler. See [`AGENTS.md`](AGENTS.md).
+**Contributing:** branch from `main`, keep changes to source here, and leave packaging and releases to formcompiler. See [`CONTRIBUTING.md`](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and [`AGENTS.md`](AGENTS.md); security problems go through [`SECURITY.md`](SECURITY.md).
 
 ## Repository
 
