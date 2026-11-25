@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "FormNET",
   "mainBinaryName": "formnet-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "ai.nodemode.formnet",
   "build": {
     "frontendDist": "splash"
@@ -40,7 +40,8 @@
     ],
     "resources": {
       "../LICENSE": "LICENSE",
-      "../NOTICES.md": "NOTICES.md"
+      "../NOTICES.md": "NOTICES.md",
+      "../licenses": "licenses"
     },
     "icon": [
       "icons/32x32.png",

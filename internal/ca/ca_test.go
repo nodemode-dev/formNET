@@ -57,8 +57,12 @@ func TestLoadCreatesAndReloadsTheSameRoot(t *testing.T) {
 	if info.UntrustCommand == "" || !namesTheRoot {
 		t.Fatalf("untrust: %q", info.UntrustCommand)
 	}
-	if !strings.Contains(info.TrustCommand, "'"+info.Path+"'") {
-		t.Fatalf("path must be single-quoted: %q", info.TrustCommand)
+	quoted := "'" + info.Path + "'"
+	if runtime.GOOS == "windows" {
+		quoted = `"` + info.Path + `"`
+	}
+	if !strings.Contains(info.TrustCommand, quoted) {
+		t.Fatalf("path must be quoted for this system's shell: %q", info.TrustCommand)
 	}
 	if first.cert.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth || len(first.cert.ExtKeyUsage) != 1 {
 		t.Fatalf("root ext key usage: %v", first.cert.ExtKeyUsage)
