@@ -2,6 +2,10 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.10.3 · 2026-11-25
+
+The first public version. It is 0.10.2 with nothing added: 0.10.2 was numbered before its licence work was finished and was never built or published, so everything listed under it below is released here.
+
 ## 0.10.2 · 2026-11-25
 
 Ready to go public: the licences travel with the app, the macOS build names its app correctly, and the README shows FormNET as it is.
