@@ -1,20 +1,21 @@
 import type { Commands } from './commands';
 import { el, setHidden, setText } from './dom';
+import { t } from './i18n';
 import { icon } from './icons';
 import { readChoice, setTheme } from './themes';
 
 /** The title bar's right-hand tools, as the family's (formvis titlebar-tools.ts, without the workspaces, the lock and
- *  the terminal buttons formNET has no use for): a theme toggle (Studio Dark and Light) and a search that finds and
+ *  the terminal buttons FormNET has no use for): a theme toggle (Studio Dark and Light) and a search that finds and
  *  runs any enabled command by name, with its shortcut shown. */
 export class TitleTools {
   readonly root = el('<div class="cv-title-tools"></div>');
   private readonly results = el('<div class="cv-search-results" role="listbox"></div>');
-  private readonly pop = el('<div class="cv-search-pop" hidden><input class="cv-search-input" type="search" placeholder="Search commands" aria-label="Search commands"></div>');
+  private readonly pop = el(`<div class="cv-search-pop" hidden><input class="cv-search-input" type="search" placeholder="${t('Search commands')}" aria-label="${t('Search commands')}"></div>`);
   private picked = 0;
 
   constructor(host: HTMLElement, private readonly commands: Commands) {
-    const theme = el<HTMLButtonElement>('<button class="cv-tt-btn" type="button" title="Light or dark" aria-label="Light or dark"></button>');
-    const search = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="Search commands" aria-label="Search commands">${icon('search', 16)}</button>`);
+    const theme = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="${t('Light or dark')}" aria-label="${t('Light or dark')}"></button>`);
+    const search = el<HTMLButtonElement>(`<button class="cv-tt-btn" type="button" title="${t('Search commands')}" aria-label="${t('Search commands')}">${icon('search', 16)}</button>`);
     const syncTheme = (): void => {
       const light = readChoice().theme === 'light';
       if (!theme.firstElementChild) theme.innerHTML = `<span class="cv-tt-sun">${icon('sun', 16)}</span><span class="cv-tt-moon">${icon('moon', 16)}</span>`;
@@ -53,11 +54,11 @@ export class TitleTools {
 
   private fill(q: string): void {
     const c = this.commands, needle = q.trim().toLowerCase();
-    const found = c.all().filter((cmd) => c.enabled(cmd) && c.label(cmd) && (!needle || c.label(cmd).toLowerCase().includes(needle))).slice(0, 8);
+    const found = c.all().filter((cmd) => c.enabled(cmd) && c.label(cmd) && (!needle || t(c.label(cmd)).toLowerCase().includes(needle) || c.label(cmd).toLowerCase().includes(needle))).slice(0, 8);
     this.results.textContent = '';
     for (const cmd of found) {
       const b = el<HTMLButtonElement>('<button class="cv-search-item" type="button" role="option"><span class="cv-search-label"></span><span class="cv-search-keys"></span></button>');
-      setText(b.querySelector('.cv-search-label') as HTMLElement, c.label(cmd).replace(/\.\.\.$/, ''));
+      setText(b.querySelector('.cv-search-label') as HTMLElement, t(c.label(cmd)).replace(/\.\.\.$/, ''));
       setText(b.querySelector('.cv-search-keys') as HTMLElement, c.keyLabel(cmd));
       b.addEventListener('click', () => { this.close(); c.run(cmd.id); });
       this.results.appendChild(b);

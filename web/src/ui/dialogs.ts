@@ -248,7 +248,10 @@ export class Dialog {
   /** Adds a labelled control to the body. */
   field(label: string, control: HTMLElement): HTMLElement {
     const row = el<HTMLElement>('<label class="cv-field"><span></span></label>');
-    setText(q(row, 'span'), label);
+    const span = q<HTMLElement>(row, 'span');
+    setText(span, t(label));
+    span.dataset.en = label;
+    span.dataset.shown = span.textContent ?? '';
     row.appendChild(control);
     this.body.appendChild(row);
     return row;
@@ -273,9 +276,9 @@ class Confirm extends Dialog {
   /** A destructive question opens with Cancel focused, so Return alone never confirms it; the arrow keys move between the buttons. */
   ask(title: string, text: string, okLabel: string, danger: boolean, cancelLabel = 'Cancel'): Promise<boolean> {
     this.setTitle(title);
-    setText(this.note, text);
-    setText(this.ok, okLabel);
-    setText(this.cancel, cancelLabel);
+    setText(this.note, t(text));
+    setText(this.ok, t(okLabel));
+    setText(this.cancel, t(cancelLabel));
     this.ok.className = danger ? 'cv-btn cv-btn-danger' : 'cv-btn cv-btn-primary';
     this.open(danger ? this.cancel : this.ok);
     return new Promise<boolean>((resolve) => { this.resolve = resolve; });
@@ -308,7 +311,7 @@ class Prompt extends Dialog {
 
   ask(title: string, value: string, okLabel: string): Promise<string | null> {
     this.setTitle(title);
-    setText(this.ok, okLabel);
+    setText(this.ok, t(okLabel));
     this.input.value = value;
     this.open(this.input);
     this.input.select();

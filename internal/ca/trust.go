@@ -17,7 +17,7 @@ func trustInstructionsFor(goos, path, commonName string) (command, hint, untrust
 	switch goos {
 	case "darwin":
 		return "security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db " + q,
-			"Adds the root to your login keychain, trusted for SSL only and for your user only; macOS asks for your password in a dialog. Safari, Chrome and most apps then accept connections formnet opens. Firefox 120 and later read the system store.",
+			"Adds the root to your login keychain, trusted for SSL only and for your user only; macOS asks for your password in a dialog. Safari, Chrome and most apps then accept connections FormNET opens. Firefox 120 and later read the system store.",
 			"security delete-certificate -c " + shellQuote(commonName) + " ~/Library/Keychains/login.keychain-db"
 	case "linux":
 		return "sudo cp " + q + " /usr/local/share/ca-certificates/formnet.crt && sudo update-ca-certificates",
@@ -25,7 +25,7 @@ func trustInstructionsFor(goos, path, commonName string) (command, hint, untrust
 			"sudo rm /usr/local/share/ca-certificates/formnet.crt && sudo update-ca-certificates --fresh"
 	case "windows":
 		return "certutil -addstore -user Root " + windowsQuote(path),
-			"Adds the root to your user's Trusted Root store (no administrator needed); Windows shows a confirmation dialog. Edge, Chrome and most apps then accept connections formnet opens. Firefox 120 and later read the system store.",
+			"Adds the root to your user's Trusted Root store (no administrator needed); Windows shows a confirmation dialog. Edge, Chrome and most apps then accept connections FormNET opens. Firefox 120 and later read the system store.",
 			"certutil -delstore -user Root " + windowsQuote(commonName)
 	default:
 		return "",

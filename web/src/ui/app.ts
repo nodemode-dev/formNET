@@ -26,11 +26,11 @@ import { toast } from './toast';
 
 const VIEWS: ReadonlyArray<readonly [View, string]> = [['flows', 'Flows'], ['hosts', 'Hosts'], ['machine', 'Machine'], ['setup', 'Setup']];
 
-const SHELL = `<div class="cv-app">
+const shell = (): string => `<div class="cv-app">
 <header class="cv-titlebar">
-<nav class="cv-menubar" aria-label="Main menu"></nav>
+<nav class="cv-menubar" aria-label="${t('Main menu')}"></nav>
 <div class="cv-tb-doc"></div>
-<div class="cv-tb-app">formNET 2026</div>
+<div class="cv-tb-app">FormNET 2026</div>
 <div class="cv-zoom"><button class="cv-tt-btn" type="button" data-cmd="settings">${icon('settings', 16)}</button></div>
 </header>
 <div class="cv-main">
@@ -42,11 +42,11 @@ const SHELL = `<div class="cv-app">
 </div>`;
 
 /** Builds the window once around the store: the family's shell (title bar, menus, view tabs, options bar, status bar,
- *  Home) with formNET's views on the stage, then connects the live data and reveals the page. */
+ *  Home) with FormNET's views on the stage, then connects the live data and reveals the page. */
 export function startApp(store: Store, onLost: () => void): void {
   const appHost = document.getElementById('app');
   if (!appHost) return;
-  mountOnce(appHost, SHELL);
+  mountOnce(appHost, shell());
   const root = q(appHost, '.cv-app');
   const stage = q(root, '.cv-stage');
   const strip = q(root, '.cv-tab-strip');
@@ -61,8 +61,9 @@ export function startApp(store: Store, onLost: () => void): void {
   const brand = q(root, '.cv-brand');
   brand.setAttribute('role', 'button');
   brand.setAttribute('tabindex', '0');
-  brand.setAttribute('aria-label', 'Home');
-  brand.title = 'Home';
+  const paintBrand = (): void => { brand.setAttribute('aria-label', t('Home')); setTitle(brand, t('Home')); };
+  paintBrand();
+  onLanguage(paintBrand);
   brand.addEventListener('click', () => home.show());
   brand.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); home.show(); } });
   const status = new StatusBar(q(root, '.cv-status'), store);
@@ -80,7 +81,7 @@ export function startApp(store: Store, onLost: () => void): void {
   }
   // The proxy address is what the window "has open": it reads at the left of the title row where the menus are the system's.
   const doc = q(root, '.cv-tb-doc');
-  const paintDoc = (): void => { const p = store.get().status?.proxy; doc.textContent = p ? `${t('Proxy')} ${p.addr}` : ''; };
+  const paintDoc = (): void => { const p = store.get().status?.proxy; const text = p ? t('Proxy {addr}').replace('{addr}', p.addr) : ''; if (doc.textContent !== text) doc.textContent = text; };
   // Every button[data-cmd] runs its command; a chrome pass keeps its disabled state and tooltip in step.
   let chromeFrame = 0;
   const syncChrome = (): void => {
@@ -91,8 +92,8 @@ export function startApp(store: Store, onLost: () => void): void {
         const cmd = commands.get(b.dataset.cmd ?? '');
         if (!cmd) continue;
         setDisabled(b, !commands.enabled(cmd));
-        const label = commands.label(cmd).replace(/\.\.\.$/, ''), keys = commands.keyLabel(cmd);
-        setTitle(b, keys ? `${label} (${keys})` : label);
+        const label = t(commands.label(cmd)).replace(/\.\.\.$/, ''), keys = commands.keyLabel(cmd);
+        setTitle(b, keys ? t('{label} ({keys})').replace('{label}', label).replace('{keys}', keys) : label);
         if (b.classList.contains('cv-tt-btn') && b.getAttribute('aria-label') !== label) b.setAttribute('aria-label', label);
       }
       for (const b of tabs) { const on = b.dataset.view === store.get().view; setClass(b, 'is-active', on); if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on)); }

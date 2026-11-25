@@ -139,10 +139,29 @@ export function reserve(el: HTMLElement, box: { width?: number; height?: number;
  * shows it whole (src-tauri/src/reveal.rs). */
 export function revealApp(): void {
   if (document.body.classList.contains('app-ready')) return;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  if (!('__TAURI_INTERNALS__' in window)) {
+    requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('app-ready')));
+    return;
+  }
+  const fonts = 'fonts' in document ? document.fonts.ready.then(() => undefined) : Promise.resolve();
+  const images = Array.from(document.querySelectorAll<HTMLImageElement>('#app img')).filter((i) => i.getClientRects().length > 0).map((i) => i.decode().catch(() => undefined));
+  const settled = Promise.race([Promise.all([fonts, ...images]), new Promise<void>((r) => setTimeout(r, 1500))]);
+  void settled.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
     document.body.classList.add('app-ready');
-    if ('__TAURI_INTERNALS__' in window) requestAnimationFrame(() => { void import('@tauri-apps/api/core').then((m) => m.invoke('app_ready')).catch(() => undefined); });
-  }));
+    requestAnimationFrame(() => { void import('@tauri-apps/api/core').then((m) => m.invoke('app_ready', { bg: shownBackground() })).catch(() => undefined); });
+  })));
+}
+
+/** The colour the window shows first, as [r, g, b], for the desktop shell to paint behind the page. */
+function shownBackground(): [number, number, number] | null {
+  for (const n of [document.querySelector('.cv-home:not([hidden])'), document.querySelector('.cv-app'), document.body]) {
+    if (!n) continue;
+    const c = getComputedStyle(n).backgroundColor, m = c.match(/-?[\d.]+/g)?.map(Number);
+    if (!m || m.length < 3 || (m.length > 3 && m[3] === 0)) continue;
+    const k = c.startsWith('color(') ? 255 : 1;
+    return [0, 1, 2].map((i) => Math.min(255, Math.max(0, Math.round((m[i] ?? 0) * k)))) as [number, number, number];
+  }
+  return null;
 }
 
 /** Mount a fresh subtree from a template string ONCE into an empty host.

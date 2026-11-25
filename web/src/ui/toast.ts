@@ -1,4 +1,5 @@
 import { el } from './dom';
+import { t } from './i18n';
 import { icon } from './icons';
 import { loadPrefs } from './prefs';
 
@@ -72,7 +73,7 @@ export function toast(text: string, kind: 'info' | 'error' = 'info', opts: Notic
   const arm = (n: Element): void => { window.clearTimeout(timers.get(n)); if (ms > 0) timers.set(n, window.setTimeout(() => n.remove(), ms)); };
   const same = Array.from(root.children).find((n) => (n as HTMLElement).dataset.text === text && n.className === cls && !actions.length && !actionsOf.has(n));
   if (same) { arm(same); return () => { window.clearTimeout(timers.get(same)); same.remove(); }; }
-  const node = el(`<div class="${cls}" role="status"><span class="cv-toast-text"></span><span class="cv-toast-actions"></span><button class="cv-toast-close" type="button" title="Dismiss" aria-label="Dismiss notice">${icon('close', 12)}</button></div>`);
+  const node = el(`<div class="${cls}" role="status"><span class="cv-toast-text"></span><span class="cv-toast-actions"></span><button class="cv-toast-close" type="button" title="${t('Dismiss')}" aria-label="${t('Dismiss notice')}">${icon('close', 12)}</button></div>`);
   node.dataset.text = text;
   node.firstElementChild!.textContent = text;
   if (actions.length) {
