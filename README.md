@@ -27,7 +27,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/formnet-hero.png" alt="FormNET Flows view: a table of local HTTP requests with status, size and timing, and the request headers and JSON body of a POST in the detail pane" width="100%">
+  <img src="docs/images/formnet-hero.png" alt="FormNET Flows view: requests from curl to package registries and a local shop API with process, status, type and size, and the request headers and JSON body of a POST in the detail pane" width="100%">
   <br>
   <sub>Live flows through the proxy, with the selected request's headers and body.</sub>
 </p>
