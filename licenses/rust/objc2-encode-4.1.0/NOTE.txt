@@ -1,0 +1,1 @@
+objc2-encode 4.1.0 declares the licence MIT in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://github.com/madsmtm/objc2.

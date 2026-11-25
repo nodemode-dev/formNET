@@ -1,0 +1,1 @@
+selectors 0.38.0 declares the licence MPL-2.0 in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://github.com/servo/stylo.

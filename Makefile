@@ -1,4 +1,4 @@
-VERSION := v0.10.1
+VERSION := v0.10.3
 LDFLAGS := -s -w -X github.com/nodemode-dev/formnet/internal/app.Version=$(VERSION)
 GO_BUILD := CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)"
 TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
@@ -23,6 +23,7 @@ release: web
 		echo "building $$os/$$arch"; \
 		GOOS=$$os GOARCH=$$arch $(GO_BUILD) -o release/formnet_$(VERSION)_$${os}_$${arch}$$ext ./cmd/formnet || exit 1; \
 	done
+	tar -czf release/formnet_$(VERSION)_licenses.tar.gz --exclude licenses/rust NOTICES.md LICENSE licenses
 	cd release && (sha256sum formnet_* > SHA256SUMS 2>/dev/null || shasum -a 256 formnet_* > SHA256SUMS)
 
 check:

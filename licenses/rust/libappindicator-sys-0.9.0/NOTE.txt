@@ -1,0 +1,1 @@
+libappindicator-sys 0.9.0 declares the licence Apache-2.0 OR MIT in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://crates.io/crates/libappindicator-sys.

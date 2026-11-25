@@ -1,0 +1,1 @@
+alloc-stdlib 0.3.0 declares the licence BSD-3-Clause in its Cargo.toml and its package holds no licence file. The standard text of each licence named is in licenses/rust/standard/; its source is https://github.com/dropbox/rust-alloc-no-stdlib.

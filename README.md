@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version v0.10.1" src="https://img.shields.io/badge/version-v0.10.1-eef0f4?style=flat-square">
+  <img alt="version v0.10.3" src="https://img.shields.io/badge/version-v0.10.3-eef0f4?style=flat-square">
   <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white">
   <img alt="TypeScript and Vite" src="https://img.shields.io/badge/TypeScript-Vite-3178c6?style=flat-square">
   <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-native-2f7bf5?style=flat-square">
@@ -27,7 +27,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/formnet-hero.png" alt="FormNET Flows view: a table of local HTTP requests with status, size and timing, and the request headers and JSON body of a POST in the detail pane" width="100%">
+  <img src="docs/images/formnet-hero.png" alt="FormNET Flows view: requests from curl to package registries and a local shop API with process, status, type and size, and the request headers and JSON body of a POST in the detail pane" width="100%">
   <br>
   <sub>Live flows through the proxy, with the selected request's headers and body.</sub>
 </p>
