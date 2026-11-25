@@ -23,6 +23,7 @@ release: web
 		echo "building $$os/$$arch"; \
 		GOOS=$$os GOARCH=$$arch $(GO_BUILD) -o release/formnet_$(VERSION)_$${os}_$${arch}$$ext ./cmd/formnet || exit 1; \
 	done
+	tar -czf release/formnet_$(VERSION)_licenses.tar.gz --exclude licenses/rust NOTICES.md LICENSE licenses
 	cd release && (sha256sum formnet_* > SHA256SUMS 2>/dev/null || shasum -a 256 formnet_* > SHA256SUMS)
 
 check:

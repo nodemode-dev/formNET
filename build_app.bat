@@ -190,9 +190,11 @@ call :cross linux arm64 || exit /b 1
 call :cross darwin amd64 || exit /b 1
 call :cross darwin arm64 || exit /b 1
 call :cross windows amd64 .exe || exit /b 1
+echo [build_app] packing release\formnet_%VERSION%_licenses.tar.gz: NOTICES.md, LICENSE and the licence texts the server binaries carry
+tar -czf "release\formnet_%VERSION%_licenses.tar.gz" --exclude licenses/rust NOTICES.md LICENSE licenses || (echo [build_app] tar could not pack the licences; Windows 10 and later carry tar.exe & exit /b 1)
 type nul > release\SHA256SUMS
 for %%f in (release\formnet_*) do call :sum "%%f" || exit /b 1
-echo [build_app] done: release\ with SHA256SUMS
+echo [build_app] done: release\ with the licences and SHA256SUMS
 exit /b 0
 
 :cross
@@ -233,7 +235,7 @@ echo   6. bundles the desktop app installers, msi and nsis, in src-tauri\target\
 echo.
 echo Options:
 echo   --server-only    stop after step 4, the server binary alone
-echo   --all            every server release target into release\ with SHA256SUMS, no desktop app
+echo   --all            every server release target into release\ with its licences and SHA256SUMS, no desktop app
 echo   --skip-web       reuse the web client already in web\dist
 echo   --debug          a debug build of the desktop app
 echo   --bundles LIST   which installers, for example msi or msi,nsis
