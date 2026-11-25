@@ -14,7 +14,7 @@ Built by Vite into `web/dist`, embedded in the formnet server and shown in the d
 | @xterm/xterm | 6.0.0 | MIT | https://github.com/xtermjs/xterm.js | the terminal dock's emulator and its stylesheet; Copyright (c) 2017-2019 The xterm.js authors, (c) 2014-2016 SourceLair Private Company, (c) 2012-2013 Christopher Jeffrey |
 | @xterm/addon-fit | 0.11.0 | MIT | https://github.com/xtermjs/xterm.js (addons/addon-fit) | sizes the terminal dock's emulator to its panel; Copyright (c) 2019 The xterm.js authors |
 
-The SIL Open Font License 1.1 text is at https://openfontlicense.org.
+Their licence texts are in `licenses/`, copied unchanged from the packages, and travel with the desktop app: `fontsource-inter-OFL.txt` and `fontsource-jetbrains-mono-OFL.txt` (the copyright lines and the SIL Open Font License 1.1, also at https://openfontlicense.org), `tauri-apps-api-LICENSE-APACHE-2.0.txt` and `tauri-apps-api-LICENSE-MIT.txt`, `xterm-LICENSE.txt` and `xterm-addon-fit-LICENSE.txt`.
 
 ## The server's Go modules
 
@@ -29,6 +29,7 @@ Linked into the `formnet` binary to decode `br` and `zstd` bodies for display an
 | github.com/coder/websocket | v1.8.15 | ISC | https://github.com/coder/websocket | the terminal dock's WebSocket; packages websocket, internal/bpool, internal/errd and internal/util, on every system; Copyright (c) 2025 Coder; `licenses/coder-websocket-LICENSE.txt` |
 | github.com/creack/pty | v1.1.24 | MIT | https://github.com/creack/pty | the terminal dock's PTY on macOS and Linux (not linked on Windows); Copyright (c) 2011 Keith Rarick; `licenses/creack-pty-LICENSE.txt` |
 | golang.org/x/sys | v0.49.0 | BSD-3-Clause | https://go.googlesource.com/sys | package unix on macOS and Linux (the terminal's process session), package windows on Windows (ConPTY and the job object); Copyright 2009 The Go Authors, with Google's additional patent grant; `licenses/golang-x-sys-LICENSE.txt` and `licenses/golang-x-sys-PATENTS.txt` |
+| Go standard library and runtime | the Go release named in `go.mod` (go1.26.9) | BSD-3-Clause | https://go.dev | compiled into every `formnet` binary; Copyright 2009 The Go Authors, with Google's additional patent grant; `licenses/go-LICENSE.txt` and `licenses/go-PATENTS.txt` |
 
 ## The desktop shell's crates (src-tauri)
 
