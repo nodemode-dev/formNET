@@ -51,6 +51,8 @@ export interface Flow {
   ttfb_ms: number;
   duration_ms: number;
   error?: string;
+  resent_from?: string;
+  edited?: boolean;
 }
 
 export interface Body {
@@ -155,6 +157,47 @@ export interface Status {
   machine: MachineStatus;
   notices?: string[] | null;
   now: string;
+  sysproxy?: SysProxyStatus;
+}
+
+export interface SysProxyService {
+  name: string;
+  web: string;
+  secure: string;
+}
+
+export interface SysProxyStatus {
+  supported: boolean;
+  reason: string;
+  enabled: boolean;
+  active: boolean;
+  address: string;
+  services: SysProxyService[] | null;
+  auto_config: boolean;
+  error: string;
+}
+
+export interface Recipe {
+  id: string;
+  title: string;
+  shell: "sh" | "powershell";
+  lines: string[];
+  note: string;
+}
+
+export interface Recipes {
+  proxy_addr: string;
+  ca_path: string;
+  platform: "darwin" | "linux" | "windows" | string;
+  recipes: Recipe[] | null;
+}
+
+export interface ResendEdit {
+  method?: string;
+  url?: string;
+  headers?: Header[];
+  body_text?: string;
+  body_base64?: string;
 }
 
 export interface FlowEvent {

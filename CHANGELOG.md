@@ -2,6 +2,15 @@
 
 Versions follow `v*.*.*` with dots. Dates are US Eastern.
 
+## 0.7.0 · 2026-11-22
+
+No setup by hand, and any request can be sent again.
+
+- On macOS and Windows FormNET can point the computer's proxy at itself while it runs (Preferences > Capture > System Proxy, off by default), so browsers and most apps show up in Flows with nothing to configure. Your previous proxy settings come back when FormNET quits, and at the next start if it ever crashed; `formnet sysproxy restore` puts them back by hand.
+- Resend any captured request, or edit its method, address, headers and body first. The new request is recorded as its own flow and links back to the original.
+- Setup shows ready-to-copy lines that send curl, Node.js, Python, Java, Go and git through FormNET, for sh and PowerShell, with this run's real address and certificate.
+- The new labels read in English in the other languages until a later version translates them.
+
 ## 0.6.0 · 2026-11-22
 
 Agents can use FormNET, and FormNET has the family's terminal panel.

@@ -12,6 +12,7 @@
 //	FORMNET_REVERSE_DNS  1 to look up names for remote addresses in the machine view; default off
 //	FORMNET_INTERCEPT    auto (open HTTPS only while the root is trusted), on, or off; when set, wins over <data>/settings.json; default auto
 //	FORMNET_TOKEN        this run's session token; default a new random one, written to <data>/token
+//	FORMNET_SYSTEM_PROXY 1 or 0: point the system proxy at formnet for this run (macOS, Windows); when set, wins over <data>/settings.json
 //	FORMNET_DESKTOP      set by the desktop app; the server stops when its stdin closes
 package config
 
@@ -49,6 +50,8 @@ type Config struct {
 	PassthroughSet  bool   // FORMNET_PASSTHROUGH was set: it wins over <data>/settings.json for this run
 	Token           string // empty means make one
 	Desktop         bool
+	SystemProxy     bool // FORMNET_SYSTEM_PROXY's value
+	SystemProxySet  bool // FORMNET_SYSTEM_PROXY was set: it wins over <data>/settings.json for this run
 }
 
 // Load resolves the configuration from the environment and the home folder.
@@ -97,7 +100,19 @@ func load(getenv func(string) string, home func() (string, error)) (Config, erro
 	if token != "" && len(token) < 16 {
 		return Config{}, errors.New("FORMNET_TOKEN: must be at least 16 characters")
 	}
+	systemProxy, systemProxySet := false, false
+	switch strings.ToLower(strings.TrimSpace(getenv("FORMNET_SYSTEM_PROXY"))) {
+	case "":
+	case "1", "true", "yes", "on":
+		systemProxy, systemProxySet = true, true
+	case "0", "false", "no", "off":
+		systemProxySet = true
+	default:
+		return Config{}, errors.New("FORMNET_SYSTEM_PROXY: must be 1 or 0")
+	}
 	return Config{
+		SystemProxy:     systemProxy,
+		SystemProxySet:  systemProxySet,
 		Data:            data,
 		ReverseDNS:      truthy(getenv("FORMNET_REVERSE_DNS")),
 		Intercept:       intercept,
