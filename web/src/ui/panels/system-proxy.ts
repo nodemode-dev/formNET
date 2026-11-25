@@ -59,8 +59,8 @@ export class SystemProxySection {
   }
 
   private set(on: boolean): void {
+    if (this.busy) { this.box.checked = !on; return; }
     this.busy = true;
-    setDisabled(this.box, true);
     api.setSysproxy(on)
       .then((sp) => {
         const status = this.store.get().status;

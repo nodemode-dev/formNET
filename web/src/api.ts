@@ -1,4 +1,5 @@
 import { authHeaders, withToken } from "./session.ts";
+import type { BreakpointEvent } from "./types-traffic.ts";
 import type { CAInfo, Flow, FlowDetail, FlowEvent, HostSummary, InterceptMode, ProxyStatus, Recipes, ResendEdit, Snapshot, Status, SysProxyStatus } from "./types.ts";
 
 const base = location.origin;
@@ -126,6 +127,7 @@ export interface StreamHandlers {
   resync: (dropped: number) => void;
   flow: (e: FlowEvent) => void;
   machine: (s: Snapshot) => void;
+  breakpoint?: (e: BreakpointEvent) => void;
   close: () => void;
   unauthorized: () => void;
 }
@@ -194,6 +196,12 @@ export function openStream(handlers: StreamHandlers): () => void {
       const s = parse<Snapshot>(ev);
       if (s) handlers.machine(s);
     });
+    for (const type of ["breakpoint.paused", "breakpoint.resumed"]) {
+      source.addEventListener(type, (ev) => {
+        const e = parse<BreakpointEvent>(ev);
+        if (e) handlers.breakpoint?.(e);
+      });
+    }
     source.onerror = () => {
       void dropped();
     };

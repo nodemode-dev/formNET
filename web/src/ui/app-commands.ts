@@ -8,6 +8,9 @@ import { wantsCustomTitleBar } from './caption-buttons';
 import { exportFilter } from './options-bar';
 import { UI_SCALES, autoUiScale, loadPrefs, setShellZoom, setUiScale, uiScaleChoice } from './prefs';
 import { PREF_PAGES, type SettingsDialog } from './settings-dialog';
+import { showBreakpoints } from './breakpoint-dialog';
+import { trafficApi } from '../api-traffic.ts';
+import { trafficOf } from '../types-traffic.ts';
 import { readChoice, setTheme } from './themes';
 import { t } from './i18n';
 import { toast } from './toast';
@@ -85,7 +88,19 @@ export function registerCommands(d: CommandDeps): Commands {
     { id: 'select-all', label: 'Select All', keys: ['Mod+A'], run: edit('selectAll') },
     { id: 'find', label: 'Filter...', keys: ['Mod+F'], run: () => { st.update({ view: 'flows' }); d.home.dismiss(); d.focusFilter(); } },
     { id: 'settings', label: 'Preferences...', keys: ['Mod+,'], run: () => d.settings.show() },
-    ...PREF_PAGES.map(([id, label, section]) => ({ id: `prefs-${id}`, label, run: () => d.settings.show(section) })),
+    ...PREF_PAGES.map(([id, label, section]) => ({ id: `prefs-${id}`, label, run: () => (id === 'rules' ? d.settings.showRules(null) : d.settings.show(section)) })),
+    { id: 'rules-toggle', label: 'Enable Rules', keys: ['Alt+Mod+K'], enabled: () => !!trafficOf(st.get().status).rules, checked: () => !!trafficOf(st.get().status).rules?.enabled, run: () => {
+      const on = !trafficOf(st.get().status).rules?.enabled;
+      trafficApi.setRulesEnabled(on)
+        .then(() => api.status()).then((status) => st.update({ status }))
+        .catch((err: Error) => st.update({ notice: err.message }));
+    } },
+    { id: 'tool-rewrite', label: 'Rewrite...', run: () => d.settings.showRules('rewrite') },
+    { id: 'tool-map-local', label: 'Map Local...', run: () => d.settings.showRules('map_local') },
+    { id: 'tool-map-remote', label: 'Map Remote...', run: () => d.settings.showRules('map_remote') },
+    { id: 'tool-block', label: 'Block List...', run: () => d.settings.showRules('block') },
+    { id: 'breakpoints-show', label: 'Breakpoints...', keys: ['Alt+Mod+B'], run: () => showBreakpoints() },
+    { id: 'tool-breakpoint-rules', label: 'Breakpoint Rules...', run: () => d.settings.showRules('breakpoint') },
     { id: 'view-flows', label: 'Flows', keys: ['Mod+1'], run: view('flows') },
     { id: 'view-hosts', label: 'Hosts', keys: ['Mod+2'], run: view('hosts') },
     { id: 'view-machine', label: 'Machine', keys: ['Mod+3'], run: view('machine') },

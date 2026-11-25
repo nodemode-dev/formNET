@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version v0.7.0" src="https://img.shields.io/badge/version-v0.7.0-eef0f4?style=flat-square">
+  <img alt="version v0.8.0" src="https://img.shields.io/badge/version-v0.8.0-eef0f4?style=flat-square">
   <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white">
   <img alt="TypeScript and Vite" src="https://img.shields.io/badge/TypeScript-Vite-3178c6?style=flat-square">
   <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-native-2f7bf5?style=flat-square">
@@ -55,7 +55,7 @@
     </td>
     <td width="25%" valign="top">
       <h3>Nothing leaves</h3>
-      Both listeners bind loopback only, and recordings stay in memory until you export them.
+      Both listeners bind loopback only unless you let a phone or another computer use the proxy, and recordings stay in memory until you export them.
     </td>
     <td width="25%" valign="top">
       <h3>Agent-ready</h3>
@@ -117,7 +117,7 @@ Also `/api/flows/{id}`, `/api/hosts`, `/api/machine`, `/api/export/har` and `/ap
 ## Under the hood
 
 - **One binary:** a Go server with the web client embedded, plus a Tauri 2 window around the same binary for the desktop app.
-- **Loopback only:** the proxy and the API refuse any other address, and the proxy never connects to loopback through a host name.
+- **Loopback by default:** the API and the page answer on loopback only, always; the proxy also listens on the network only while "capture from other devices" is on, for the addresses you allow. The proxy never connects to loopback through a host name.
 - **Local root:** the certificate is made on first run, its private key never leaves `~/formnet`, and HTTPS is opened only once you trust it.
 - **Tested:** 82 Go tests and a Playwright window smoke in CI.
 
@@ -147,7 +147,7 @@ For client development, `cd web && npm ci && npm run dev` serves the client on h
 
 Then point a program at the proxy, for example `curl -x http://127.0.0.1:8761 http://example.com/`. Until the computer trusts the root, HTTPS is tunnelled and counted but not opened; `./bin/formnet ca trust` prints the command that trusts it for your user only.
 
-The client and API listen on 127.0.0.1:8760 and the proxy on 127.0.0.1:8761 (loopback only; the client needs this run's session token). Settings are `FORMNET_*` environment variables, such as `FORMNET_DATA`, `FORMNET_PASSTHROUGH` and `FORMNET_INTERCEPT`; `./bin/formnet help` lists them all.
+The client and API listen on 127.0.0.1:8760 and the proxy on 127.0.0.1:8761 (loopback only, unless capture from other devices is on, which adds the proxy alone on the addresses you allow; the client needs this run's session token). Settings are `FORMNET_*` environment variables, such as `FORMNET_DATA`, `FORMNET_PASSTHROUGH` and `FORMNET_INTERCEPT`; `./bin/formnet help` lists them all.
 
 > [!IMPORTANT]
 > **Status:** early (v0.1). The desktop window source has not been compiled yet, and the process column in Flows is filled only where the platform reports it.

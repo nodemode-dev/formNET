@@ -235,10 +235,37 @@ function relabel(tr: HTMLTableRowElement, f: Flow): void {
   if (kind) setText(kind, t(kindLabel(f.kind)));
   const mark = c[4]?.querySelector<HTMLElement>(".resent-mark");
   if (mark) { setTitle(mark, resentText(f)); mark.setAttribute("aria-label", mark.title); }
+  for (const kind of ["paused", "rules", "throttled"] as const) {
+    const m = c[4]?.querySelector<HTMLElement>(`.traffic-${kind}`);
+    if (m) { setTitle(m, trafficText(kind, f)); m.setAttribute("aria-label", m.title); }
+  }
   if (f.error) setText(c[5] ?? null, t("error"));
   setText(c[7] ?? null, bytes(f.bytes_sent));
   setText(c[8] ?? null, bytes(f.bytes_received));
   setText(c[9] ?? null, f.pending ? "" : millis(f.duration_ms));
+}
+
+// trafficText is what a traffic mark says: paused at a breakpoint, changed by rules, slowed by the throttle.
+function trafficText(kind: "paused" | "rules" | "throttled", f: Flow): string {
+  if (kind === "paused") return t(f.paused === "response" ? "Paused at the response. Click to open the Breakpoints panel." : "Paused at the request. Click to open the Breakpoints panel.");
+  if (kind === "rules") return t("Changed by {rules}").replace("{rules}", (f.rules ?? []).join(", "));
+  return t("Slowed by the throttle");
+}
+
+// trafficMarks are small fixed-width icons in front of the path, so a row's height never changes.
+function trafficMarks(f: Flow): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  const add = (kind: "paused" | "rules" | "throttled", name: string): void => {
+    const text = trafficText(kind, f);
+    const mark = h("span", { class: `traffic-mark traffic-${kind}`, role: "img", title: text, "aria-label": text });
+    mark.innerHTML = icon(name, 12);
+    if (kind === "paused") mark.addEventListener("click", (e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent("formnet:run", { detail: "breakpoints-show" })); });
+    out.push(mark);
+  };
+  if (f.paused) add("paused", "pause");
+  if (f.rules?.length) add("rules", "rules");
+  if (f.throttled) add("throttled", "throttle");
+  return out;
 }
 
 function resentMark(f: Flow): HTMLElement {
@@ -258,7 +285,7 @@ function buildRow(f: Flow, select: (id: string) => void): HTMLTableRowElement {
     h("td", { class: "proc", title: f.client_pid ? t("pid {pid}, {client}").replace("{pid}", String(f.client_pid)).replace("{client}", f.client) : f.client }, f.client_process ?? ""),
     h("td", { class: `mono ${methodClass(f.method)}` }, f.method),
     h("td", { class: "host" }, f.host, f.port && f.port !== 443 && f.port !== 80 ? h("span", { class: "dim" }, `:${f.port}`) : null),
-    h("td", { class: "path mono", title: f.url }, f.resent_from ? resentMark(f) : null, kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
+    h("td", { class: "path mono", title: f.url }, f.resent_from ? resentMark(f) : null, ...trafficMarks(f), kind ? h("span", { class: `kind kind-${f.kind}` }, t(kind)) : null, f.kind === "tunnel" || f.kind === "refused" ? "" : pathWithQuery(f.path, f.query)),
     h("td", { class: `status mono ${statusClass(f.status, f.error)}`, title: f.error ?? "" }, status),
     h("td", { class: "type" }, shortType(f.response?.content_type)),
     h("td", { class: "num mono" }, bytes(f.bytes_sent)),
